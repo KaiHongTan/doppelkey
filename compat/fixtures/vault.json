@@ -1,0 +1,83 @@
+{
+  "_comment": "FAKE secrets for tests only. A real keeper reads the OS keychain.",
+  "salt": "4g8cdxa9ENEdh3lBcD3Zy9qyrm4STNy0eXgEMI7bLa0=",
+  "keys": {
+    "JWT_SECRET": {
+      "id": "a1b2c3d4e5f6",
+      "value": "real-jwt-secret-3f9c1e7a5b2d8c4e6f1a9b3d7e5c2a8f",
+      "allow": [
+        "hmac"
+      ]
+    },
+    "COOKIE_SECRET": {
+      "id": "0f1e2d3c4b5a",
+      "value": "real-cookie-secret-8e2b4d6f1a3c5e7b9d0f2a4c6e8b1d3f",
+      "allow": [
+        "hmac"
+      ]
+    },
+    "STRIPE_WEBHOOK_SECRET": {
+      "id": "112233445566",
+      "prefix": "whsec_",
+      "value": "whsec_realStripeSigningSecret1234567890abcd",
+      "allow": [
+        "hmac"
+      ]
+    },
+    "AUTH_SECRET": {
+      "id": "99aabbccddee",
+      "value": "real-auth-secret-for-hkdf-7c1e3a5b9d2f4e6a8c0b",
+      "allow": [
+        "hkdf"
+      ]
+    },
+    "SESSION_PASSWORD": {
+      "id": "5e55105a55aa",
+      "value": "real-iron-session-password-at-least-32-chars-long",
+      "allow": [
+        "pbkdf2"
+      ]
+    },
+    "ENCRYPTION_KEY": {
+      "id": "e1e2e3e4e5e6",
+      "form": "compact",
+      "value": "real-aes-key-0123456789abcdef!!!",
+      "allow": [
+        "aes_gcm",
+        "aes_cbc"
+      ]
+    },
+    "ENCRYPTION_KEY_HEX": {
+      "id": "f0f1f2f3f4f5",
+      "form": "hex",
+      "value_b64": "fc1o+F8pvd7matCuy90+mFlNLYpBLr8Rqhexm1d7IxU=",
+      "allow": [
+        "aes_gcm",
+        "aes_cbc",
+        "hmac"
+      ]
+    },
+    "SVIX_SECRET": {
+      "id": "5c5c5c5c5c5c",
+      "form": "base64",
+      "prefix": "whsec_",
+      "value_b64": "uX7ZE1BS9zYEeFjUEaYUSoAd7umj72fB",
+      "allow": [
+        "hmac"
+      ]
+    },
+    "AWS_SECRET_ACCESS_KEY": {
+      "id": "a0a0b1b1c2c2",
+      "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      "allow": [
+        "hmac"
+      ],
+      "profile": "aws-sigv4",
+      "access_key_id": "AKIAIOSFODNN7EXAMPLE",
+      "services": [
+        "s3"
+      ],
+      "sigv2": true
+    }
+  }
+}

@@ -262,11 +262,12 @@ Rough estimate: a typical SaaS `.env` holds 10 to 25 secrets, of which 3 to 6 ar
 ## 14. Milestones and acceptance criteria
 
 ### Milestone 1: Node shim package (`shims/node`)
-- [ ] Port `prototype/shim.cjs` to TypeScript; build `dist/register.cjs` and `dist/register.mjs`; zero dependencies.
-- [ ] Implement wire protocol v1 client and `dk1:` handle parsing (sections 7 and 8).
-- [ ] Add `createCipheriv`/`createDecipheriv` (GCM, CBC), streaming HMAC (`.write`/`.pipe`), and a startup warning listing pure-JS crypto packages found in `node_modules`.
-- [ ] Port the prototype keeper as a test keeper (Node) speaking v1, so shim work isn't blocked on Rust.
+- [x] Port `prototype/shim.cjs` to TypeScript; build `dist/register.cjs` and `dist/register.mjs`; zero dependencies.
+- [x] Implement wire protocol v1 client and `dk1:` handle parsing (sections 7 and 8). *Refined in `docs/protocol.md`: 12-hex ids, a 20-byte compact form, encoded (hex/base64) handles, `pbkdf2` op.*
+- [x] Add `createCipheriv`/`createDecipheriv` (GCM, CBC), streaming HMAC (`.write`/`.pipe`), and a startup warning listing pure-JS crypto packages found in `node_modules`. *Plus: pure-JS adapters for fast-sha256 (svix), @noble/hashes and @oslojs/crypto via `module.registerHooks`; PBKDF2; fail-closed refusals for unsupported algorithms.*
+- [x] Port the prototype keeper as a test keeper (Node) speaking v1, so shim work isn't blocked on Rust. *`compat/test-keeper`.*
 - **Done when:** `compat/node` passes for jsonwebtoken, jose, cookie-signature, stripe (sync and async), AWS SDK v3 (S3) on Node 20, 22, 24, with the heap scan finding 0 real keys; shim is a no-op when no handles are present (benchmark shows no measurable overhead).
+  - *Status (31 Oct 2026): met locally on Node 22, 24 and 26 (47/47 tests), and on Bun 1.4 (43 pass, 4 skipped: no V8 heap snapshot, no `registerHooks`). Node 20 is end-of-life since April 2026 and lacks `module.registerHooks`; on it everything passes except the pure-JS adapters, which fall back to the startup warning. CI (`.github/workflows/ci.yml`) runs Node 22/24/26 on Linux and macOS plus Bun; it hasn't run on GitHub yet.*
 
 ### Milestone 2: Rust keeper (`crates/doppelkeyd`)
 - [ ] tokio Unix socket server implementing every v1 op with RustCrypto; `peer_cred()` uid check; JSON Lines audit log.

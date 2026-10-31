@@ -1,0 +1,167 @@
+{
+  "format": "doppelkey handle vectors v1",
+  "spec": "docs/protocol.md",
+  "vectors": [
+    {
+      "input": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "valid": true,
+      "handle": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "prefix": "",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "long form"
+    },
+    {
+      "input": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae....",
+      "valid": true,
+      "handle": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae....",
+      "prefix": "",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "long form, padded"
+    },
+    {
+      "input": "dk1:a1b2c3d4e5f6d3ae",
+      "valid": true,
+      "handle": "dk1:a1b2c3d4e5f6d3ae",
+      "prefix": "",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "compact form (20 bytes, fits SHA-1-derived keys)"
+    },
+    {
+      "input": "dk1:a1b2c3d4e5f6d3ae............",
+      "valid": true,
+      "handle": "dk1:a1b2c3d4e5f6d3ae............",
+      "prefix": "",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "compact, padded to 32 bytes (AES-256 key)"
+    },
+    {
+      "input": "dk1:a1b2c3d4e5f6d3ae............dk1:0123456789ab594e............",
+      "valid": true,
+      "handle": "dk1:a1b2c3d4e5f6d3ae............dk1:0123456789ab594e............",
+      "prefix": "",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6",
+        "0123456789ab"
+      ],
+      "note": "split-half: 64-byte key as two handles"
+    },
+    {
+      "input": "whsec_dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "valid": true,
+      "handle": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "prefix": "whsec_",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "vendor prefix"
+    },
+    {
+      "input": "AWS4dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "valid": true,
+      "handle": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "prefix": "AWS4",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "SigV4 key-schedule prefix"
+    },
+    {
+      "input": "12345678dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "valid": true,
+      "handle": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "prefix": "12345678",
+      "key_encoding": null,
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "prefix of 8 bytes (maximum)"
+    },
+    {
+      "input": "646b313a613162326333643465356636643361652e2e2e2e2e2e2e2e2e2e2e2e",
+      "valid": true,
+      "handle": "dk1:a1b2c3d4e5f6d3ae............",
+      "prefix": "",
+      "key_encoding": "hex",
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "hex text of a compact handle"
+    },
+    {
+      "input": "ZGsxOmExYjJjM2Q0ZTVmNmQzYWUuLi4uLi4uLi4uLi4=",
+      "valid": true,
+      "handle": "dk1:a1b2c3d4e5f6d3ae............",
+      "prefix": "",
+      "key_encoding": "base64",
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "base64 text of a compact handle"
+    },
+    {
+      "input": "123456789dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
+      "valid": false,
+      "note": "prefix longer than 8 bytes"
+    },
+    {
+      "input": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:0000",
+      "valid": false,
+      "note": "bad checksum"
+    },
+    {
+      "input": "DK1:NOT-A-SECRET-LOAD-DOPPELKEY-SHIM:A1B2C3D4E5F6:D3AE",
+      "valid": false,
+      "note": "uppercase"
+    },
+    {
+      "input": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3aex",
+      "valid": false,
+      "note": "trailing garbage"
+    },
+    {
+      "input": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae ",
+      "valid": false,
+      "note": "trailing space"
+    },
+    {
+      "input": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f:d3ae",
+      "valid": false,
+      "note": "short id"
+    },
+    {
+      "input": "dk1:NOT-A-SECRET-load-doppelkey-shimXa1b2c3d4e5f6:d3ae",
+      "valid": false,
+      "note": "label typo"
+    },
+    {
+      "input": "dk1:",
+      "valid": false,
+      "note": "marker only"
+    },
+    {
+      "input": "real-jwt-secret-3f9c1e7a5b2d8c4e6f1a9b3d7e5c2a8f",
+      "valid": false,
+      "note": "an ordinary secret"
+    },
+    {
+      "input": "KH1:a1b2c3d4e5f60718.......................",
+      "valid": false,
+      "note": "prototype handle (KH1) is not v1"
+    }
+  ]
+}

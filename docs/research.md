@@ -101,7 +101,7 @@ Caveat: under Bun, Stripe resolves to its edge build, which has no sync `constru
 | `doppelkey` | free | free | free | one 2021 hobby repo (BartAgterbosch/Doppelkey, keystroke replay, 1★) |
 | `dopplekey` | free | free | free | this repo, plus an empty 2022 repo |
 
-- **This repo is spelled `dopplekey`** (two `p`s before the `l`, then `e`). The product name in the brief is **doppelkey**. Pick one before reserving names. Renaming the repo is cheap now.
+- **This repo is spelled `dopplekey`**; the product name is **doppelkey** (decided 31 Oct 2026). Rename the GitHub repo to match.
 - **Confusion risk:** **Doppler**, a well-known secrets manager in the same category. No trademark search was done.
 - Reserving the names is a manual step for the owner.
 
@@ -202,4 +202,4 @@ Test: a target process holding a secret, and an attacker process running as the 
 - Deno (not installed here).
 - ESM virtual-wrapper adapters for `@noble/*` and `@oslojs/*` (PoC done only for CJS `fast-sha256`).
 - Yarn classic auto-load.
-- The repo vs product spelling, and name reservation.
+- Renaming the GitHub repo to `doppelkey`, and name reservation.

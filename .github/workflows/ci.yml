@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Build the shim
+        working-directory: shims/node
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+      - name: Check the shim has no runtime dependencies
+        working-directory: shims/node
+        run: node -e "const p=require('./package.json'); if (p.dependencies && Object.keys(p.dependencies).length) { console.error('shims/node must have zero runtime dependencies'); process.exit(1) }"
+      - name: Compatibility suite (oracle pattern)
+        working-directory: compat/node
+        run: |
+          npm ci
+          node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs
+
+  bun:
+    name: bun (apps) / ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+      - name: Build the shim
+        working-directory: shims/node
+        run: npm ci && npm run build
+      - name: Compatibility suite with apps running under Bun
+        working-directory: compat/node
+        run: |
+          npm ci
+          DOPPELKEY_TEST_RUNTIME="$(which bun)" node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs

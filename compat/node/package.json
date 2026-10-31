@@ -1,0 +1,27 @@
+{
+  "name": "doppelkey-compat-node",
+  "private": true,
+  "type": "module",
+  "description": "Oracle-pattern compatibility tests: apps run with handles + the shim, a separate process holding the real keys verifies every output.",
+  "scripts": {
+    "pretest": "npm --prefix ../../shims/node run build",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "bench": "node bench.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.900.0",
+    "@aws-sdk/client-s3": "^3.900.0",
+    "@aws-sdk/s3-request-presigner": "^3.900.0",
+    "@noble/hashes": "^2.0.0",
+    "@octokit/webhooks-methods": "^6.0.0",
+    "@oslojs/crypto": "^1.0.1",
+    "cookie-signature": "^1.2.2",
+    "hono": "^4.9.0",
+    "iron-session": "^9.0.1",
+    "jose": "^6.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "next-auth": "^4.24.0",
+    "stripe": "^23.1.0",
+    "svix": "^2.9.1"
+  }
+}

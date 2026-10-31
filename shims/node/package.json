@@ -1,0 +1,25 @@
+{
+  "name": "doppelkey",
+  "version": "0.0.1",
+  "description": "ssh-agent for app secrets: keep signing and encryption keys out of your app's memory (Node shim)",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "exports": {
+    "./register": {
+      "import": "./dist/register.mjs",
+      "require": "./dist/register.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}
