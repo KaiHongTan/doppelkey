@@ -19,15 +19,17 @@ NODE_OPTIONS="--require doppelkey/register" npm run dev
 | | `hkdf`, `hkdfSync`, `pbkdf2`, `pbkdf2Sync` | keeper returns a new handle |
 | | `createSecretKey`, `KeyObject.from`, `KeyObject#export` | decoy `KeyObject` of random bytes; `export()` gives back the handle |
 | | `scrypt`, `scryptSync` | refused (not supported yet) |
+| node:crypto | `createHash`, `crypto.hash` over a handle | a new handle; RFC 7638 JWK thumbprints of a handle are computed by the keeper (Auth.js `kid`) |
 | WebCrypto | `importKey` (raw, jwk) | decoy `CryptoKey` of random bytes |
 | | `sign`, `verify` (HMAC) | keeper `hmac` |
 | | `encrypt`, `decrypt` (AES-GCM, AES-CBC) | keeper |
 | | `deriveBits`, `deriveKey` (HKDF, PBKDF2) | new handle |
 | | `exportKey` | the handle |
+| | `digest` | same rules as `createHash` |
 | | `wrapKey`, `unwrapKey`, other algorithms | refused |
-| Pure JS (Node ≥ 22.15) | `fast-sha256` (svix), `@noble/hashes` `hmac` / `hkdf`, `@oslojs/crypto` `hmac` | keeper, via `module.registerHooks` |
+| Pure JS | `fast-sha256` (svix), `@noble/hashes` `hmac` / `hkdf`, `@oslojs/crypto` `hmac` | keeper, via `module.registerHooks` (Node ≥ 22.15) or a runtime plugin (Bun) |
 
-Other pure-JS crypto packages bypass the shim. When handles are in use, the shim prints a one-time warning naming them. This also covers the adapted packages on Bun and Node 20, which lack `module.registerHooks`.
+Other pure-JS crypto packages bypass the shim. When handles are in use, the shim prints a one-time warning naming them. On Node < 22.15 (no `module.registerHooks`) the adapted packages fall back to that warning too.
 
 ## Behaviour
 

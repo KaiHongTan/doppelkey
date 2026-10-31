@@ -9,6 +9,7 @@ import nodeModule from 'node:module';
 import path from 'node:path';
 import { refOfKeyMaterial } from './handle';
 import * as ops from './ops';
+import { installBunAdapters } from './bun';
 
 const API = Symbol.for('doppelkey.purejs');
 
@@ -219,7 +220,7 @@ export function installPureJs(): { adapters: string[]; warned: string[] } {
   let dirs: string[] = [];
   try { dirs = nodeModulesDirs(process.cwd()); } catch { /* no cwd */ }
   const adapted = findInstalled(ADAPTED, dirs);
-  const hooks = adapted.size > 0 && installHooks();
+  const hooks = adapted.size > 0 && (installHooks() || installBunAdapters());
   const result = { adapters: hooks ? [...adapted] : [], warned: [] as string[] };
 
   if (process.env.DOPPELKEY_QUIET === '1' || process.env.DOPPELKEY_PUREJS_CHECKED === '1') return result;
