@@ -207,6 +207,43 @@ pub fn dispatch(shared: &Shared, body: &[u8], peer: &Peer) -> Value {
                 Err(e) => fail(ErrorCode::Locked, &e, Some("doppelkey unlock"), None),
             };
         }
+        "confirm" => {
+            // Human gate for CLI actions that weaken protection (eject, loosening a policy).
+            // The keeper writes the prompt and runs it with its own environment, so the
+            // program asking (possibly an agent) can't approve itself.
+            let detail: String = req
+                .get("detail")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(200)
+                .collect();
+            let what = match req.get("action").and_then(Value::as_str) {
+                Some("eject") => "write real secret values back to disk (doppelkey eject)",
+                Some("loosen_policy") => "loosen a key's policy (doppelkey policy)",
+                _ => return wire::err(id, ErrorCode::BadRequest, "unknown confirm action", None),
+            };
+            let who = peer
+                .exe
+                .clone()
+                .unwrap_or_else(|| format!("pid {}", peer.pid.unwrap_or(0)));
+            let prompt = format!("A program ({who}) wants to {what}: {detail}. Allow?");
+            let allowed = matches!(confirm::ask(&prompt), confirm::Answer::Allow);
+            shared.audit.record(
+                &op,
+                None,
+                allowed,
+                if allowed {
+                    None
+                } else {
+                    Some("confirm_denied")
+                },
+                None,
+                peer,
+            );
+            return wire::ok(id, json!({ "allowed": allowed }));
+        }
         "lock" => {
             shared.lock_keys();
             shared.audit.record(&op, None, true, None, None, peer);

@@ -39,7 +39,9 @@ before(() => {
   fs.writeFileSync(path.join(dir, '.env'), ENV);
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'sample', private: true, scripts: { start: 'node app.js' } }));
   fs.writeFileSync(path.join(dir, 'app.js'), APP);
-  env = { PATH: `${BIN}:${process.env.PATH}`, HOME: home, DOPPELKEY_HOME: path.join(home, 'dk'), DOPPELKEY_SOCK: path.join(home, 'k.sock'), DOPPELKEY_PASSPHRASE: 'correct horse battery staple', DOPPELKEY_SERVICE: 'detached' };
+  env = { PATH: `${BIN}:${process.env.PATH}`, HOME: home, DOPPELKEY_HOME: path.join(home, 'dk'), DOPPELKEY_SOCK: path.join(home, 'k.sock'), DOPPELKEY_PASSPHRASE: 'correct horse battery staple', DOPPELKEY_SERVICE: 'detached',
+    // The keeper (started by `init`) inherits this: it stands in for the human clicking Allow.
+    DOPPELKEY_ASKPASS: 'true' };
 });
 after(() => { if (!missing) spawnSync(path.join(BIN, 'doppelkey'), ['service', 'uninstall'], { env, encoding: 'utf8' }); });
 
@@ -65,13 +67,12 @@ test('init, normal npm start, doctor, eject', { skip: missing }, () => {
 
   const doctor = sh('doppelkey', ['doctor']);
   assert.equal(doctor.status, 0, doctor.stdout);
-  assert.match(doctor.stdout, /keeper memory is protected/);
+  if (process.platform === 'linux') assert.match(doctor.stdout, /keeper memory is protected/);
 
   const vault = fs.readFileSync(path.join(home, 'dk/vault.dk'));
   assert.ok(!vault.includes('my-super-secret') && !vault.includes(Buffer.from('my-super-secret').toString('base64').slice(0, 12)), 'vault is encrypted');
 
-  assert.equal(sh('doppelkey', ['eject']).status, 1, 'eject needs a human');
-  const ej = sh('doppelkey', ['eject'], { DOPPELKEY_ASKPASS: '/bin/true' });
+  const ej = sh('doppelkey', ['eject']);
   assert.equal(ej.status, 0, ej.stderr);
   assert.equal(fs.readFileSync(path.join(dir, '.env'), 'utf8'), ENV, '.env restored byte for byte');
   for (const f of ['.npmrc', 'AGENTS.md', '.claude', '.doppelkey']) assert.ok(!fs.existsSync(path.join(dir, f)), `${f} removed`);
@@ -96,7 +97,7 @@ print(json.dumps({'sig': hmac.new(key, b'value', 'sha256').hexdigest(), 'raw': h
   const shimmed = py();
   assert.equal(shimmed.status, 0, shimmed.stderr);
   assert.deepEqual(JSON.parse(shimmed.stdout), plain);
-  const ej = spawnSync('doppelkey', ['eject'], { cwd: pdir, env: { ...env, DOPPELKEY_ASKPASS: '/bin/true' }, encoding: 'utf8' });
+  const ej = spawnSync('doppelkey', ['eject'], { cwd: pdir, env, encoding: 'utf8' });
   assert.equal(ej.status, 0, ej.stderr);
   assert.equal(fs.readFileSync(path.join(pdir, '.env'), 'utf8'), ENVTXT);
   const pth = spawnSync('find', [path.join(pdir, '.venv'), '-name', 'doppelkey.pth'], { encoding: 'utf8' }).stdout.trim();
@@ -128,7 +129,7 @@ puts OpenSSL::HMAC.hexdigest("SHA256", key, "payload")`;
   const shimmed = rb();
   assert.equal(shimmed.status, 0, shimmed.stderr);
   assert.equal(shimmed.stdout, plain.stdout, 'same HMAC through the keeper');
-  const ej = spawnSync('doppelkey', ['eject'], { cwd: rdir, env: { ...env, DOPPELKEY_ASKPASS: '/bin/true' }, encoding: 'utf8' });
+  const ej = spawnSync('doppelkey', ['eject'], { cwd: rdir, env, encoding: 'utf8' });
   assert.equal(ej.status, 0, ej.stderr);
   assert.equal(fs.readFileSync(path.join(rdir, '.env'), 'utf8'), ENVTXT);
   assert.equal(fs.readFileSync(path.join(rdir, 'config/boot.rb'), 'utf8'), BOOT);

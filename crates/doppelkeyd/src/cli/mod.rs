@@ -11,7 +11,7 @@ pub mod service;
 
 use crate::state::{Policy, ALL_OPS};
 use crate::store::{self, Header, KekKind, StoredKey, VaultData};
-use crate::{audit, confirm, paths};
+use crate::{audit, paths};
 use base64::Engine;
 use clap::{Parser, Subcommand};
 use classify::Decision;
@@ -358,12 +358,22 @@ fn sync_keeper(v: &Vault, start: bool) -> String {
     }
 }
 
-/// A human must approve: a terminal prompt, or the keeper-style GUI/askpass prompt.
-fn human_confirm(question: &str) -> bool {
+/// A human must approve: a terminal prompt, or a prompt shown by the keeper. The keeper runs
+/// its prompt with its own environment, so a non-interactive caller (an agent) can't approve
+/// its own request, e.g. by setting DOPPELKEY_ASKPASS for this process.
+fn human_confirm(action: &str, detail: &str) -> bool {
     if prompt::is_interactive() {
-        return prompt::yes_no(question);
+        return prompt::yes_no(&format!("Allow doppelkey to {detail}?"));
     }
-    matches!(confirm::ask(question), confirm::Answer::Allow)
+    match Client::connect()
+        .and_then(|mut c| c.call("confirm", json!({ "action": action, "detail": detail })))
+    {
+        Ok(r) => r.get("allowed") == Some(&json!(true)),
+        Err(e) => {
+            eprintln!("doppelkey: cannot ask for confirmation: {e}");
+            false
+        }
+    }
 }
 
 fn new_id(v: &VaultData) -> String {
@@ -773,11 +783,14 @@ fn eject(dir: &Path, keep_keys: bool) -> R<()> {
     let m = Manifest::load(dir).ok_or(
         "this project has no doppelkey manifest (.doppelkey/manifest.json); nothing to eject",
     )?;
-    if !human_confirm(&format!(
-        "Write the real secret values back into the .env files of {}?",
-        dir.display()
-    )) {
-        return Err("eject writes real secrets to disk, so a human must confirm it in a terminal (or via DOPPELKEY_ASKPASS). Nothing changed".into());
+    if !human_confirm(
+        "eject",
+        &format!(
+            "write the real values of the secrets back into the .env files of {}",
+            dir.display()
+        ),
+    ) {
+        return Err("eject writes real secrets to disk, so a human must confirm it in a terminal or in the keeper's prompt. Nothing changed".into());
     }
     let mut v = Vault::open()?;
     let mut problems = Vec::new();
@@ -1126,8 +1139,8 @@ fn policy(dir: &Path, name: Option<String>, edit: PolicyEdit) -> R<()> {
     }
     let deny_sigv2 = edit.deny.iter().any(|d| d == "sigv2");
     let allow_ops = ops_from(allow_ops)?;
-    if edit.loosens() && !human_confirm(&format!("Loosen the policy for {name}?")) {
-        return Err("loosening a policy needs a human to confirm it in a terminal (or via DOPPELKEY_ASKPASS). Nothing changed".into());
+    if edit.loosens() && !human_confirm("loosen_policy", &format!("loosen the policy for {name}")) {
+        return Err("loosening a policy needs a human to confirm it in a terminal or in the keeper's prompt. Nothing changed".into());
     }
     for id in &ids {
         let p = &mut v.data.keys.get_mut(id).unwrap().policy;

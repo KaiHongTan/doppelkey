@@ -29,16 +29,29 @@ pub fn ask(prompt: &str) -> Answer {
         };
     }
     if cfg!(target_os = "macos") {
-        let mut c = Command::new("osascript");
         let script = format!(
             "display dialog \"{}\" with title \"doppelkey\" buttons {{\"Deny\", \"Allow\"}} default button \"Deny\" cancel button \"Deny\" giving up after 60",
             prompt.replace('\\', "\\\\").replace('"', "\\\"")
         );
-        c.args(["-e", &script]);
-        return match run(c) {
-            Some(true) => Answer::Allow,
-            Some(false) => Answer::Deny,
-            None => Answer::Unavailable,
+        // Only an explicit click on Allow counts. A timeout ("gave up:true") also exits 0.
+        return match Command::new("osascript")
+            .args(["-e", &script])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+        {
+            Ok(out) => {
+                let text = String::from_utf8_lossy(&out.stdout);
+                if out.status.success()
+                    && text.contains("button returned:Allow")
+                    && !text.contains("gave up:true")
+                {
+                    Answer::Allow
+                } else {
+                    Answer::Deny
+                }
+            }
+            Err(_) => Answer::Unavailable,
         };
     }
     if std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some() {

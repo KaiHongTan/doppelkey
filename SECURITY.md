@@ -23,7 +23,7 @@ doppelkey protects keys an app computes with (signing, webhook, encryption and A
 | Read the vault file | It is encrypted (XChaCha20-Poly1305); the key-encryption key comes from your passphrase (Argon2id) or the macOS Keychain |
 | Read the keeper's memory | Linux: blocked, because the keeper is non-dumpable (`PR_SET_DUMPABLE=0`), even with Yama off. macOS: blocked only for a Developer ID-signed, hardened-runtime build |
 | Inject code into the keeper with `LD_PRELOAD` / `DYLD_*` | The keeper refuses to start with those set; the systemd unit unsets them |
-| Run `doppelkey eject` or loosen a policy | Needs a human: a terminal confirmation or a GUI/askpass prompt |
+| Run `doppelkey eject` or loosen a policy | Needs a human: a terminal confirmation, or a prompt the **keeper** shows using its own environment. The caller's environment can't approve the request (for example by setting `DOPPELKEY_ASKPASS`), and a dialog that times out counts as a refusal |
 | Ask the keeper to export a key | There is no such operation; a test checks every op's responses for key bytes |
 | Ask the keeper to sign or decrypt while it runs | **Works**, like ssh-agent. Limited by per-key allowed ops, rate limits and optional confirm prompts, and recorded in the audit log with the caller's pid and executable |
 
@@ -31,6 +31,7 @@ doppelkey protects keys an app computes with (signing, webhook, encryption and A
 
 - **Misuse is not prevented.** Anything that can reach the socket can use the keys within policy. Use separate development keys, and turn on `--confirm` for sensitive keys.
 - **The keeper's own files.** An agent that can edit your user service definition or replace a user-writable binary can make a fake keeper ask for your passphrase. Install `doppelkeyd` read-only (`install.sh` does `chmod 0555`; root-owned is better). `doppelkey doctor` reports the service location.
+- **The keeper's environment.** The keeper takes its prompt program (`DOPPELKEY_ASKPASS`) from its own environment, set when the service was installed. An agent that can restart the keeper with its own environment (for example by editing the user service) could change that. This is the same class of risk as replacing the binary above.
 - **`--protect file`** keeps the vault key in a plain file next to the vault. That is convenient for throwaway keys only; a same-user process can read both files.
 - **macOS memory protection** relies on code signing. Unsigned or ad-hoc builds can be read with a debugger on a typical development Mac.
 - **Pure-JavaScript crypto** packages without an adapter bypass the shim. Their results are wrong rather than leaking the key, and the shim warns about them at startup.

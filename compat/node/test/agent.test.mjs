@@ -24,7 +24,9 @@ before(() => {
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'a', private: true, scripts: { test: 'node test.js' } }));
   fs.writeFileSync(path.join(dir, 'test.js'), `const fs=require('fs'),c=require('crypto');for(const l of fs.readFileSync('.env','utf8').split('\\n')){const m=l.match(/^(\\w+)=(.*)$/);if(m)process.env[m[1]]=m[2]}
 console.log(c.createHmac('sha256',process.env.JWT_SECRET).update('t').digest('hex'))`);
-  env = { PATH: `${BIN}:${process.env.PATH}`, HOME: home, DOPPELKEY_HOME: path.join(home, 'dk'), DOPPELKEY_SOCK: path.join(home, 'k.sock'), DOPPELKEY_PASSPHRASE: 'human-only passphrase', DOPPELKEY_SERVICE: 'detached' };
+  env = { PATH: `${BIN}:${process.env.PATH}`, HOME: home, DOPPELKEY_HOME: path.join(home, 'dk'), DOPPELKEY_SOCK: path.join(home, 'k.sock'), DOPPELKEY_PASSPHRASE: 'human-only passphrase', DOPPELKEY_SERVICE: 'detached',
+    // The keeper inherits this at start: the human says no to every confirmation.
+    DOPPELKEY_ASKPASS: 'false' };
   const init = sh('doppelkey', ['init', '--yes']);
   if (init.status !== 0) throw new Error(init.stdout + init.stderr);
   delete env.DOPPELKEY_PASSPHRASE; // the agent doesn't know it
@@ -52,11 +54,11 @@ test('the vault is encrypted and the passphrase is needed to open it', { skip: m
   assert.match(p.stderr, /passphrase/);
 });
 
-test('eject and policy loosening are refused without a human', { skip: missing }, () => {
-  const e = sh('doppelkey', ['eject']);
+test('eject and policy loosening are refused without a human, even if the agent sets DOPPELKEY_ASKPASS', { skip: missing }, () => {
+  const e = sh('doppelkey', ['eject'], { DOPPELKEY_ASKPASS: 'true' });
   assert.notEqual(e.status, 0);
   assert.equal(fs.readFileSync(path.join(dir, '.env'), 'utf8').includes(SECRETS.JWT_SECRET), false);
-  const pol = sh('doppelkey', ['policy', 'JWT_SECRET', '--allow', 'aes_gcm'], { DOPPELKEY_PASSPHRASE: 'human-only passphrase' });
+  const pol = sh('doppelkey', ['policy', 'JWT_SECRET', '--allow', 'aes_gcm'], { DOPPELKEY_PASSPHRASE: 'human-only passphrase', DOPPELKEY_ASKPASS: 'true' });
   assert.notEqual(pol.status, 0);
   assert.match(pol.stderr, /needs a human/);
 });
