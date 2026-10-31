@@ -270,18 +270,20 @@ Rough estimate: a typical SaaS `.env` holds 10 to 25 secrets, of which 3 to 6 ar
   - *Status (31 Oct 2026): met locally on Node 22, 24 and 26 (47/47 tests), and on Bun 1.4 (43 pass, 4 skipped: no V8 heap snapshot, no `registerHooks`). Node 20 is end-of-life since April 2026 and lacks `module.registerHooks`; on it everything passes except the pure-JS adapters, which fall back to the startup warning. CI (`.github/workflows/ci.yml`) runs Node 22/24/26 on Linux and macOS plus Bun; it hasn't run on GitHub yet.*
 
 ### Milestone 2: Rust keeper (`crates/doppelkeyd`)
-- [ ] tokio Unix socket server implementing every v1 op with RustCrypto; `peer_cred()` uid check; JSON Lines audit log.
-- [ ] Keys from `keyring` v3; held in `zeroize`/`memsafe` buffers; `prctl(PR_SET_DUMPABLE,0)` and no core dumps on Linux.
-- [ ] Policy TOML: per-key allowed ops, rate limits, confirm prompts.
-- [ ] launchd and systemd user-service install/uninstall.
-- [ ] Test vectors from `crates/proto` shared with both shims.
+- [x] tokio Unix socket server implementing every v1 op with RustCrypto; `peer_cred()` uid check; JSON Lines audit log. *Audit entries include the caller's pid and executable.*
+- [x] Keys from `keyring` v3; held in `zeroize`/`memsafe` buffers; `prctl(PR_SET_DUMPABLE,0)` and no core dumps on Linux. *Changed after research: keys live in an encrypted vault file (XChaCha20-Poly1305) whose key comes from a passphrase (Argon2id), the macOS Keychain (`macos-keychain` feature, via `keyring`), or a 0600 file. Linux Secret Service was rejected because any same-user process can read it. In memory: zeroized, `mlock`ed buffers; `PR_SET_DUMPABLE=0`, `RLIMIT_CORE=0`, `PT_DENY_ATTACH` on macOS; refuses to start with `LD_PRELOAD`/`DYLD_*` set.*
+- [x] Policy TOML: per-key allowed ops, rate limits, confirm prompts. *Policy is stored inside the encrypted vault so an agent can't loosen it by editing a file; `doppelkey policy` shows and edits it as TOML, and loosening needs a human (terminal or askpass).*
+- [x] launchd and systemd user-service install/uninstall. *`doppelkey service install|uninstall`, with a hardened systemd unit; falls back to a detached keeper where neither exists.*
+- [x] Test vectors from `crates/proto` shared with both shims. *`crates/proto/vectors/handles.json`, checked by Rust, Node and Python.*
 - **Done when:** the Milestone 1 compat suite passes against `doppelkeyd` instead of the test keeper; a test proves no op returns key bytes; a non-descendant process cannot read keeper memory on Linux.
+  - *Status (31 Oct 2026): met. The compat suite passes against doppelkeyd; a fuzz test of every op finds no key bytes in any response; run as a non-root user, reading `/proc/<pid>/mem` and `environ` of doppelkeyd fails with EACCES, while the same read succeeds against the unhardened Node test keeper.*
 
 ### Milestone 3: onboarding CLI and Python
-- [ ] `init` (stack detection, `.env` discovery, preview, keychain migration, auto-load writers for `.npmrc`, `bunfig.toml`, venv `.pth`, `.claude/settings.json`, `AGENTS.md`/`CLAUDE.md` note), `protect`, `set`, `eject`, `doctor`, `run`, `log`.
-- [ ] Python package `doppelkey` installing `doppelkey.pth`; port `prototype/pyshim/sitecustomize.py`.
-- [ ] Route hashes whose input contains a handle to the keeper (fixes Auth.js `kid`).
+- [x] `init` (stack detection, `.env` discovery, preview, keychain migration, auto-load writers for `.npmrc`, `bunfig.toml`, venv `.pth`, `.claude/settings.json`, `AGENTS.md`/`CLAUDE.md` note), `protect`, `set`, `eject`, `doctor`, `run`, `log`. *Also `pnpm-workspace.yaml`, `.env.yarn` (Yarn 2+), `policy`, `status`, `list`, `unlock`/`lock`, `service`. `init` classifies secrets (network credentials are skipped) and picks format-preserving handle forms.*
+- [x] Python package `doppelkey` installing `doppelkey.pth`; port `prototype/pyshim/sitecustomize.py`. *`shims/python`; also wraps `cryptography`'s AESGCM.*
+- [x] Route hashes whose input contains a handle to the keeper (fixes Auth.js `kid`). *New `jwk_thumbprint` op; other hashes over a handle return a handle (`hash_derive`).*
 - **Done when:** on a fresh Next.js + Auth.js app and a fresh Django app, `npx doppelkey init` then the normal dev command works; Auth.js tokens made locally verify on an unshimmed server holding the real secret; `eject` restores the original files byte for byte.
+  - *Status (31 Oct 2026): met with the `doppelkey` binary (the `npx` launcher arrives with Milestone 4 packaging). Next.js 16 + @auth/core 0.41: `doppelkey init` then `npm run dev`; the token decrypts on a real-key server. Django 6.1: `doppelkey init` then `manage.py runserver`; signatures verify under the real `SECRET_KEY`. `eject` restores `.env` byte for byte (automated in `compat/node/test/cli.test.mjs`).*
 
 ### Milestone 4: agent integrations and launch
 - [ ] Claude Code plugin (skill, `SessionStart` hook, `.mcp.json`); generic SKILL.md for Codex and others; `doppelkey mcp`.
