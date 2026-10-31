@@ -70,6 +70,8 @@ function resolve(req, op) {
   const prefix = req.prefix !== undefined ? b(req.prefix, 'prefix').toString('latin1') : '';
   if (prefix && !(k.prefix && prefix === k.prefix) && !(k.profile === 'aws-sigv4' && prefix === 'AWS4' && op === 'hmac'))
     throw new KErr('op_not_allowed', `a key of the form <prefix><handle> is not allowed for ${k.name}`);
+  // Encoded forms store the decoded bytes without the vendor prefix; the text key is prefix + encoding.
+  if (prefix && req.key_encoding !== undefined) key = Buffer.concat([Buffer.from(prefix, 'latin1'), key]);
   return { k, key, prefix, ids };
 }
 

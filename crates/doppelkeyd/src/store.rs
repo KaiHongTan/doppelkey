@@ -110,6 +110,10 @@ pub struct VaultData {
     /// Base64 salt for derived-handle ids (keeps derived handles stable across restarts).
     pub salt: String,
     pub keys: BTreeMap<String, StoredKey>,
+    /// Original contents (base64) of project files `init` modified, by absolute path, so
+    /// `eject` can restore them byte for byte. Kept here because they may hold other secrets.
+    #[serde(default)]
+    pub backups: BTreeMap<String, String>,
 }
 
 impl VaultData {
@@ -118,6 +122,7 @@ impl VaultData {
             version: 1,
             salt: B64.encode(crypto::random_bytes::<32>()),
             keys: BTreeMap::new(),
+            backups: BTreeMap::new(),
         }
     }
 

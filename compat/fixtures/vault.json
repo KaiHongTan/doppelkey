@@ -78,6 +78,15 @@
         "s3"
       ],
       "sigv2": true
+    },
+    "STRIPE_WEBHOOK_SECRET_B64": {
+      "id": "5a5b5c5d5e5f",
+      "form": "base64",
+      "prefix": "whsec_",
+      "value_b64": "realStripeB64Secret0123456789abc",
+      "allow": [
+        "hmac"
+      ]
     }
   }
 }

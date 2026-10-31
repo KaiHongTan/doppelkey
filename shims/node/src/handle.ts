@@ -69,15 +69,29 @@ function refFromText(text: string, length: number): KeyRef | null {
   return ref;
 }
 
+/** Where an encoded handle starts (after a prefix of at most 8 bytes), or -1. */
+function encodedStart(text: string): number {
+  const h = text.indexOf(HEX_MARK);
+  if (h !== -1 && h <= MAX_PREFIX) return h;
+  const b = text.indexOf(B64_MARK);
+  return b !== -1 && b <= MAX_PREFIX ? b : -1;
+}
+
+/** [prefix] + hex or base64 text of a handle, e.g. svix's `whsec_<base64>`. */
 function refFromEncodedText(text: string): KeyRef | null {
+  const start = encodedStart(text);
+  if (start === -1) return null;
+  const body = text.slice(start);
   let enc: 'hex' | 'base64' | null = null;
-  if (text.startsWith(HEX_MARK) && /^[0-9a-f]+$/.test(text) && text.length % 2 === 0) enc = 'hex';
-  else if (text.startsWith(B64_MARK) && /^[A-Za-z0-9+/]+={0,2}$/.test(text)) enc = 'base64';
+  if (body.startsWith(HEX_MARK) && /^[0-9a-f]+$/.test(body) && body.length % 2 === 0) enc = 'hex';
+  else if (body.startsWith(B64_MARK) && /^[A-Za-z0-9+/]+={0,2}$/.test(body)) enc = 'base64';
   if (!enc) return null;
-  const decoded = Buffer.from(text, enc).toString('latin1');
+  const decoded = Buffer.from(body, enc).toString('latin1');
   const p = parseKeyText(decoded);
   if (!p || p.prefix) return null;
-  return { handle: p.handle, keyEncoding: enc, length: Buffer.byteLength(text) };
+  const ref: KeyRef = { handle: p.handle, keyEncoding: enc, length: Buffer.byteLength(text) };
+  if (start > 0) ref.prefix = Buffer.from(text.slice(0, start), 'latin1');
+  return ref;
 }
 
 /**
@@ -90,16 +104,15 @@ export function refOfKeyMaterial(key: unknown, encoding: BufferEncoding = 'utf8'
       const b = Buffer.from(key, encoding);
       return refFromText(b.toString('latin1'), b.length);
     }
-    if (key.startsWith(HEX_MARK) || key.startsWith(B64_MARK)) return refFromEncodedText(key);
-    return null;
+    return encodedStart(key) === -1 ? null : refFromEncodedText(key);
   }
   const b = asBuffer(key);
   if (!b || b.length < 20) return null;
   if (b.indexOf(MARK) !== -1) return refFromText(b.toString('latin1'), b.length);
   // Encoded-handle text passed as bytes (e.g. TextEncoder output of a hex string).
-  if (b[0] === 0x36 || b[0] === 0x5a) {
+  if (b.indexOf(HEX_MARK) !== -1 || b.indexOf(B64_MARK) !== -1) {
     const t = b.toString('latin1');
-    if (t.startsWith(HEX_MARK) || t.startsWith(B64_MARK)) return refFromEncodedText(t);
+    if (encodedStart(t) !== -1) return refFromEncodedText(t);
   }
   return null;
 }
@@ -114,6 +127,7 @@ export function refFields(ref: KeyRef): Record<string, unknown> {
 
 /** The key bytes the app originally passed (prefix + handle, or its encoded text). Safe to reveal. */
 export function materialOf(ref: KeyRef): Buffer {
-  const raw = Buffer.concat([ref.prefix ?? Buffer.alloc(0), Buffer.from(ref.handle, 'latin1')]);
-  return ref.keyEncoding ? Buffer.from(raw.toString(ref.keyEncoding), 'latin1') : raw;
+  const body = Buffer.from(ref.handle, 'latin1');
+  const enc = ref.keyEncoding ? Buffer.from(body.toString(ref.keyEncoding), 'latin1') : body;
+  return Buffer.concat([ref.prefix ?? Buffer.alloc(0), enc]);
 }

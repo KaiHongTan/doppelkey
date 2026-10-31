@@ -101,7 +101,7 @@ export function scan(file, needles) {
 }
 
 /** Generate a fresh Stripe-format signature header with the real secret (Stripe's side). */
-export async function stripeHeader(payload) {
+export async function stripeHeader(payload, secret = real('STRIPE_WEBHOOK_SECRET').toString()) {
   const { default: Stripe } = await import('stripe');
-  return new Stripe('sk_test_dummy').webhooks.generateTestHeaderString({ payload, secret: real('STRIPE_WEBHOOK_SECRET').toString() });
+  return new Stripe('sk_test_dummy').webhooks.generateTestHeaderString({ payload, secret });
 }

@@ -185,6 +185,10 @@ fn resolve(state: &State, req: &Value, op: &str) -> Result<Resolved, KErr> {
                 format!("a key of the form <prefix><handle> is not allowed for {name}"),
             ));
         }
+        // Encoded forms store the decoded bytes without the vendor prefix; the text key is prefix + encoding.
+        if req.get("key_encoding").is_some() {
+            key = Zeroizing::new([prefix.as_bytes(), key.as_slice()].concat());
+        }
     }
     let (stage, scope) = if parts.len() == 1 {
         (parts[0].sigv4_stage, parts[0].scope.clone())
@@ -343,10 +347,19 @@ pub fn run(state: &mut State, req: &Value) -> Result<(Value, AuditInfo), KErr> {
     let seed_extra =
         |r: &Resolved| format!("{}|{}", r.ids.join("+"), str_field(req, "key_encoding"));
     match op.as_str() {
-        "status" => Ok((
-            json!({ "version": VERSION, "protocol": 1, "locked": state.locked, "keys": state.root_names() }),
-            AuditInfo::default(),
-        )),
+        "status" => {
+            let mut ids: Vec<&String> = state
+                .keys
+                .iter()
+                .filter(|(_, e)| e.root.is_none() && !e.name.starts_with("derived:"))
+                .map(|(id, _)| id)
+                .collect();
+            ids.sort();
+            Ok((
+                json!({ "version": VERSION, "protocol": 1, "locked": state.locked, "keys": state.root_names(), "ids": ids, "non_dumpable": crate::harden::is_non_dumpable() }),
+                AuditInfo::default(),
+            ))
+        }
         "hmac" => {
             let alg = hash_field(req, "alg")?;
             let r = resolve(state, req, "hmac")?;

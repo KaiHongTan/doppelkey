@@ -118,25 +118,32 @@ pub fn recognise(key: &[u8]) -> Option<KeyRef> {
         return None;
     }
     let text = std::str::from_utf8(key).ok()?;
-    let (enc, decoded): (&'static str, Vec<u8>) = if text.starts_with("646b313a")
-        && text.len().is_multiple_of(2)
-        && text
+    // [prefix] + hex or base64 text of a handle, e.g. svix's `whsec_<base64>`.
+    let start = [text.find("646b313a"), text.find("ZGsxO")]
+        .into_iter()
+        .flatten()
+        .filter(|&i| i <= MAX_PREFIX)
+        .min()?;
+    let body = &text[start..];
+    let (enc, decoded): (&'static str, Vec<u8>) = if body.starts_with("646b313a")
+        && body.len().is_multiple_of(2)
+        && body
             .bytes()
             .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
     {
         (
             "hex",
-            (0..text.len())
+            (0..body.len())
                 .step_by(2)
-                .map(|i| u8::from_str_radix(&text[i..i + 2], 16))
+                .map(|i| u8::from_str_radix(&body[i..i + 2], 16))
                 .collect::<Result<_, _>>()
                 .ok()?,
         )
-    } else if text.starts_with("ZGsxO") {
+    } else if body.starts_with("ZGsxO") {
         (
             "base64",
             base64::engine::general_purpose::STANDARD
-                .decode(text)
+                .decode(body)
                 .ok()?,
         )
     } else {
@@ -145,7 +152,7 @@ pub fn recognise(key: &[u8]) -> Option<KeyRef> {
     let inner = std::str::from_utf8(&decoded).ok()?;
     let ids = parse_handle(inner)?;
     Some(KeyRef {
-        prefix: Vec::new(),
+        prefix: text.as_bytes()[..start].to_vec(),
         handle: inner.to_string(),
         ids,
         key_encoding: Some(enc),
@@ -168,6 +175,19 @@ pub enum Form {
     Hex,
     /// Base64 of the padded compact core (for secrets the app base64-decodes).
     Base64,
+}
+
+impl std::str::FromStr for Form {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Form, String> {
+        match s {
+            "long" => Ok(Form::Long),
+            "compact" => Ok(Form::Compact),
+            "hex" => Ok(Form::Hex),
+            "base64" => Ok(Form::Base64),
+            _ => Err(format!("unknown form \"{s}\" (long, compact, hex, base64)")),
+        }
+    }
 }
 
 /// The `.env` value for a secret. `key_len` is the length of the real key bytes (decoded for
@@ -213,25 +233,14 @@ pub fn env_value(
 /// Find every handle id mentioned in a text (e.g. a whole `.env` file), in any form.
 pub fn ids_in_text(text: &str) -> Vec<String> {
     let mut out = Vec::new();
-    for token in
-        text.split(|c: char| c.is_whitespace() || c == '=' || c == '"' || c == '\'' || c == '`')
-    {
-        let t = token.trim_end_matches(',');
-        if let Some(r) = recognise(t.as_bytes()) {
+    for token in text.split(|c: char| {
+        c.is_whitespace() || c == '=' || c == '"' || c == '\'' || c == '`' || c == ','
+    }) {
+        if let Some(r) = recognise(token.as_bytes()) {
             out.extend(r.ids);
-        } else if let Some(i) = t.find(MARK) {
-            if let Some(r) = recognise(&t.as_bytes()[i..]) {
+        } else if let Some(i) = token.find(MARK) {
+            if let Some(r) = recognise(&token.as_bytes()[i..]) {
                 out.extend(r.ids);
-            }
-        } else {
-            // vendor prefix + encoded form, e.g. whsec_<base64>
-            for p in 1..=MAX_PREFIX.min(t.len()) {
-                if let Some(r) = recognise(&t.as_bytes()[p..]) {
-                    if r.key_encoding.is_some() {
-                        out.extend(r.ids);
-                        break;
-                    }
-                }
             }
         }
     }

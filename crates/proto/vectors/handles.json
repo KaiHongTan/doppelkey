@@ -114,9 +114,25 @@
       "note": "base64 text of a compact handle"
     },
     {
+      "input": "whsec_ZGsxOmExYjJjM2Q0ZTVmNmQzYWUuLi4uLi4uLi4uLi4=",
+      "valid": true,
+      "handle": "dk1:a1b2c3d4e5f6d3ae............",
+      "prefix": "whsec_",
+      "key_encoding": "base64",
+      "ids": [
+        "a1b2c3d4e5f6"
+      ],
+      "note": "vendor prefix + base64 handle (svix and Stripe whsec_ secrets)"
+    },
+    {
       "input": "123456789dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae",
       "valid": false,
       "note": "prefix longer than 8 bytes"
+    },
+    {
+      "input": "123456789646b313a613162326333643465356636643361652e2e2e2e2e2e2e2e2e2e2e2e",
+      "valid": false,
+      "note": "prefix longer than 8 bytes before an encoded handle"
     },
     {
       "input": "dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:0000",

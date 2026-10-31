@@ -29,6 +29,7 @@ const stripe = new Stripe('sk_test_dummy');
 const payload = env.STRIPE_PAYLOAD, header = env.STRIPE_HEADER;
 await attempt('stripeSync', () => stripe.webhooks.constructEvent(payload, header, env.STRIPE_WEBHOOK_SECRET).type);
 await attempt('stripeAsync', async () => (await stripe.webhooks.constructEventAsync(payload, header, env.STRIPE_WEBHOOK_SECRET, undefined, Stripe.createSubtleCryptoProvider())).type);
+await attempt('stripeB64Form', () => stripe.webhooks.constructEvent(payload, env.STRIPE_HEADER_B64, env.STRIPE_WEBHOOK_SECRET_B64).type);
 await attempt('stripeForged', async () => (await stripe.webhooks.constructEventAsync(payload.replace('succeeded', 'failed'), header, env.STRIPE_WEBHOOK_SECRET, undefined, Stripe.createSubtleCryptoProvider())).type);
 
 // AWS SDK v3: a stub request handler captures signed requests; nothing is sent to AWS.

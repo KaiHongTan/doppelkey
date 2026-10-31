@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import jwt from 'jsonwebtoken';
-import { startKeeper, runApp, real, scan, stripeHeader, vault, isBun } from '../lib/harness.mjs';
+import { startKeeper, runApp, real, scan, stripeHeader, vault, isBun, handleEnv } from '../lib/harness.mjs';
 import { verifyAws } from '../lib/aws-oracle.mjs';
 
 let keeper, run;
@@ -15,7 +15,7 @@ const AWS_ENV = { AWS_ACCESS_KEY_ID: 'AKIAIOSFODNN7EXAMPLE', AWS_REGION: 'ap-sou
 
 before(async () => {
   keeper = await startKeeper();
-  run = runApp('m1.mjs', { keeper, heap: true, env: { ...AWS_ENV, STRIPE_PAYLOAD: payload, STRIPE_HEADER: await stripeHeader(payload) } });
+  run = runApp('m1.mjs', { keeper, heap: true, env: { ...AWS_ENV, STRIPE_PAYLOAD: payload, STRIPE_HEADER: await stripeHeader(payload), STRIPE_HEADER_B64: await stripeHeader(payload, 'whsec_' + real('STRIPE_WEBHOOK_SECRET_B64').toString('base64')) } });
 });
 after(() => keeper?.stop());
 
@@ -23,7 +23,7 @@ const r = () => run.results;
 const JWT = () => real('JWT_SECRET');
 
 test('no unexpected errors', () => {
-  const { stripeForged, cookieTampered, dynamodb, stripeSync, ...rest } = r().errors;
+  const { stripeForged, cookieTampered, dynamodb, stripeSync, stripeB64Form, ...rest } = r().errors;
   assert.deepEqual(rest, {});
   if (!isBun) assert.equal(stripeSync, undefined);
 });
@@ -58,6 +58,11 @@ test('stripe webhooks verify a header signed with the real secret (sync and asyn
   if (!isBun) assert.equal(r().stripeSync, 'payment_intent.succeeded'); // Bun gets Stripe's edge build: async only
   assert.equal(r().stripeAsync, 'payment_intent.succeeded');
   assert.match(r().errors.stripeForged, /signature/i);
+});
+
+test('stripe webhook secret written in the whsec_ + base64 handle form (used as text by Stripe)', { skip: isBun && 'sync Stripe API not available on Bun' }, () => {
+  assert.match(handleEnv.STRIPE_WEBHOOK_SECRET_B64, /^whsec_ZGsxO/);
+  assert.equal(r().stripeB64Form, 'payment_intent.succeeded');
 });
 
 test('AWS SDK v3: S3 request and presigned URL verify under the real secret; DynamoDB refused by policy', () => {
