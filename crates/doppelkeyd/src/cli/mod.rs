@@ -885,10 +885,7 @@ fn run_cmd(cmd: &[String]) -> R<()> {
     }
     if let Some(rb) = &al.ruby_register {
         let cur = std::env::var("RUBYOPT").unwrap_or_default();
-        c.env(
-            "RUBYOPT",
-            format!("{cur} -r{}", rb.display()).trim().to_string(),
-        );
+        c.env("RUBYOPT", format!("{cur} -r{}", rb.display()).trim());
     }
     let e = c.exec();
     Err(format!("cannot run {}: {e}", cmd[0]))
