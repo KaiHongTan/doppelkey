@@ -65,7 +65,9 @@ class RubyShimTest < Minitest::Test
       dir = Dir.mktmpdir("dk-rbkeeper-")
       sock = File.join(dir, "k.sock")
       cmd = (ENV["DOPPELKEY_KEEPER_CMD"] || "node #{File.join(ROOT, "compat/test-keeper/keeper.mjs")}").split
-      keeper = IO.popen(cmd + ["--vault", VAULT_FILE, "--socket", sock, "--audit", File.join(dir, "audit.jsonl")])
+      # Like the real service, no code-injection variables (doppelkeyd refuses them).
+      clean = %w[LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH DYLD_FRAMEWORK_PATH].to_h { |v| [v, nil] }
+      keeper = IO.popen(clean, cmd + ["--vault", VAULT_FILE, "--socket", sock, "--audit", File.join(dir, "audit.jsonl")])
       raise "keeper did not start" unless keeper.gets.to_s.include?("listening")
       out = File.join(dir, "results.json")
       env = VAULT["keys"].to_h { |n, e| [n, env_value(e)] }.merge(

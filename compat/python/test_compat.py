@@ -98,7 +98,9 @@ class Keeper(object):
         os.chmod(self.dir, 0o700)
         self.sock = os.path.join(self.dir, "k.sock")
         cmd = os.environ.get("DOPPELKEY_KEEPER_CMD", "").split() or ["node", os.path.join(ROOT, "compat/test-keeper/keeper.mjs")]
-        self.proc = subprocess.Popen(cmd + ["--vault", VAULT_FILE, "--socket", self.sock, "--audit", os.path.join(self.dir, "audit.jsonl")], stdout=subprocess.PIPE)
+        # Like the real service, no code-injection variables (doppelkeyd refuses them; CI sets LD_LIBRARY_PATH).
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "DYLD_"))}
+        self.proc = subprocess.Popen(cmd + ["--vault", VAULT_FILE, "--socket", self.sock, "--audit", os.path.join(self.dir, "audit.jsonl")], stdout=subprocess.PIPE, env=env)
         line = self.proc.stdout.readline().decode()
         assert "listening" in line, line
 

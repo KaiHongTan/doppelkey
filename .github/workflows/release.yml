@@ -111,7 +111,11 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           node packaging/npm/make-platform-packages.mjs "$VERSION" dist out
           for d in out/*/; do (cd "$d" && npm publish --provenance --access public); done
-          cd shims/node && npm ci && npm run build && npm version --no-git-tag-version "$VERSION" && npm publish --provenance --access public
+          cd shims/node && npm ci && npm run build && npm version --no-git-tag-version "$VERSION"
+          # The per-platform binaries are added as optional dependencies only at publish time
+          # (they don't exist on the registry before the first release, which would break npm ci).
+          for p in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do npm pkg set "optionalDependencies.@doppelkey/cli-$p=$VERSION"; done
+          npm publish --provenance --access public
 
   pypi:
     runs-on: ubuntu-latest

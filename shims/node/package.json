@@ -32,12 +32,6 @@
   "bin": {
     "doppelkey": "bin/doppelkey.js"
   },
-  "optionalDependencies": {
-    "@doppelkey/cli-linux-x64": "0.1.0",
-    "@doppelkey/cli-linux-arm64": "0.1.0",
-    "@doppelkey/cli-darwin-x64": "0.1.0",
-    "@doppelkey/cli-darwin-arm64": "0.1.0"
-  },
   "keywords": [
     "secrets",
     "security",

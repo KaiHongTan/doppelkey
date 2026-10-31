@@ -46,7 +46,11 @@ export async function startKeeper({ vaultFile = VAULT_FILE, env = {} } = {}) {
   const sock = path.join(dir, 'k.sock');
   const audit = path.join(dir, 'audit.jsonl');
   const cmd = process.env.DOPPELKEY_KEEPER_CMD ? process.env.DOPPELKEY_KEEPER_CMD.split(' ') : [process.execPath, path.join(ROOT, 'compat/test-keeper/keeper.mjs')];
-  const child = spawn(cmd[0], [...cmd.slice(1), '--vault', vaultFile, '--socket', sock, '--audit', audit], { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, ...env } });
+  // Like the real service, start the keeper without code-injection variables (doppelkeyd refuses
+  // to start with them; CI images often set LD_LIBRARY_PATH).
+  const keeperEnv = { ...process.env, ...env };
+  for (const v of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'LD_AUDIT', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH']) delete keeperEnv[v];
+  const child = spawn(cmd[0], [...cmd.slice(1), '--vault', vaultFile, '--socket', sock, '--audit', audit], { stdio: ['ignore', 'pipe', 'inherit'], env: keeperEnv });
   await new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('keeper did not start')), 10000);
     child.stdout.on('data', (d) => { if (String(d).includes('listening')) { clearTimeout(t); resolve(); } });
