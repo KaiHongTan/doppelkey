@@ -35,6 +35,12 @@ jobs:
       - name: Build the Node shim
         working-directory: shims/node
         run: npm ci && npm run build
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Build the Java agent
+        run: sh shims/java/build.sh
       - name: Build binaries
         run: cargo build --release --locked --target ${{ matrix.target }} ${{ contains(matrix.target, 'apple') && '--features macos-keychain' || '' }}
       - name: Sign and notarize (macOS, when signing secrets are configured)
@@ -57,6 +63,7 @@ jobs:
           cp shims/node/dist/register.cjs shims/node/dist/register.mjs "$NAME/share/doppelkey/node/"
           cp -R shims/python/src/doppelkey shims/python/src/sitecustomize.py "$NAME/share/doppelkey/python/"
           mkdir -p "$NAME/share/doppelkey/ruby" && cp -R shims/ruby/lib/. "$NAME/share/doppelkey/ruby/"
+          mkdir -p "$NAME/share/doppelkey/java" && cp shims/java/dist/doppelkey-agent.jar "$NAME/share/doppelkey/java/"
           cp LICENSE README.md "$NAME/"
           tar czf "$NAME.tar.gz" "$NAME"
           shasum -a 256 "$NAME.tar.gz" > "$NAME.tar.gz.sha256"

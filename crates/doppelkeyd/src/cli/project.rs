@@ -126,6 +126,8 @@ pub struct AutoLoad {
     pub python_dir: Option<PathBuf>,
     /// Path of the Ruby shim's register.rb.
     pub ruby_register: Option<PathBuf>,
+    /// Path of the Java agent jar.
+    pub java_agent: Option<PathBuf>,
 }
 
 /// Plan auto-load edits for the runners this project uses.
@@ -266,6 +268,17 @@ pub fn plan_autoload(dir: &Path, a: &AutoLoad) -> (Vec<Change>, Vec<String>) {
             (None, _) => notes.push("Ruby shim not found: set DOPPELKEY_RUBY_SHIM".into()),
         }
     }
+    // Java: JVM apps load the agent from JAVA_TOOL_OPTIONS (set by `doppelkey env` / `run`).
+    if ["pom.xml", "build.gradle", "build.gradle.kts"]
+        .iter()
+        .any(|f| has(f))
+    {
+        if a.java_agent.is_some() {
+            notes.push("Java project: start the app with \"doppelkey run -- <command>\" or eval \"$(doppelkey env)\" (sets JAVA_TOOL_OPTIONS=-javaagent:…)".into());
+        } else {
+            notes.push("Java agent not found: set DOPPELKEY_JAVA_AGENT".into());
+        }
+    }
     // Note for coding agents.
     let note_file = if has("CLAUDE.md") && !has("AGENTS.md") {
         "CLAUDE.md"
@@ -380,10 +393,17 @@ pub fn autoload_for(dir: &Path) -> AutoLoad {
         "shims/ruby/lib",
     )
     .map(|p| stable_copy(&p, "ruby").join("doppelkey/register.rb"));
+    let java_agent = find_shim(
+        "DOPPELKEY_JAVA_AGENT",
+        "share/doppelkey/java/doppelkey-agent.jar",
+        "shims/java/dist/doppelkey-agent.jar",
+    )
+    .map(|p| stable_copy(&p, "java/doppelkey-agent.jar"));
     AutoLoad {
         node_require,
         python_dir,
         ruby_register,
+        java_agent,
     }
 }
 

@@ -887,6 +887,13 @@ fn run_cmd(cmd: &[String]) -> R<()> {
         let cur = std::env::var("RUBYOPT").unwrap_or_default();
         c.env("RUBYOPT", format!("{cur} -r{}", rb.display()).trim());
     }
+    if let Some(jar) = &al.java_agent {
+        let cur = std::env::var("JAVA_TOOL_OPTIONS").unwrap_or_default();
+        c.env(
+            "JAVA_TOOL_OPTIONS",
+            format!("{cur} -javaagent:{}", jar.display()).trim(),
+        );
+    }
     let e = c.exec();
     Err(format!("cannot run {}: {e}", cmd[0]))
 }
@@ -1015,6 +1022,15 @@ fn print_env(dir: &Path) -> R<()> {
         println!(
             "export RUBYOPT=\"${{RUBYOPT:+$RUBYOPT }}\"{}",
             q(&format!("-r{}", rb.display()))
+        );
+    }
+    let is_java = ["pom.xml", "build.gradle", "build.gradle.kts"]
+        .iter()
+        .any(|f| dir.join(f).exists());
+    if let (true, Some(jar)) = (is_java, &al.java_agent) {
+        println!(
+            "export JAVA_TOOL_OPTIONS=\"${{JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }}\"{}",
+            q(&format!("-javaagent:{}", jar.display()))
         );
     }
     if let Some(sock) = std::env::var_os("DOPPELKEY_SOCK") {
