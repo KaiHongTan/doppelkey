@@ -11,8 +11,14 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist"],
-  "engines": { "node": ">=22" },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p ."
@@ -21,5 +27,30 @@
     "@types/node": "^22.15.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.0"
-  }
+  },
+  "bin": {
+    "doppelkey": "bin/doppelkey.js"
+  },
+  "optionalDependencies": {
+    "@doppelkey/cli-linux-x64": "0.1.0",
+    "@doppelkey/cli-linux-arm64": "0.1.0",
+    "@doppelkey/cli-darwin-x64": "0.1.0",
+    "@doppelkey/cli-darwin-arm64": "0.1.0"
+  },
+  "keywords": [
+    "secrets",
+    "security",
+    "ai-agents",
+    "jwt",
+    "hmac",
+    "webcrypto",
+    "ssh-agent",
+    "dotenv"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KaiHongTan/dopplekey.git",
+    "directory": "shims/node"
+  },
+  "homepage": "https://github.com/KaiHongTan/dopplekey#readme"
 }

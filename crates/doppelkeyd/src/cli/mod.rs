@@ -147,6 +147,11 @@ enum Cmd {
     },
     /// MCP server (stdio) for coding agents: status, doctor, list_secrets (names only).
     Mcp,
+    /// Print shell `export` lines that load the shims for this project (used by agent hooks).
+    Env {
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -235,6 +240,7 @@ pub fn main() -> ExitCode {
             }
         },
         Cmd::Mcp => mcp::serve(),
+        Cmd::Env { dir } => print_env(&dir_or_cwd(dir)),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -972,6 +978,37 @@ fn list(dir: &Path) -> R<()> {
     let m = Manifest::load(dir).ok_or("no doppelkey manifest here (run \"doppelkey init\")")?;
     for s in &m.secrets {
         println!("{:<28} {:<20} id {}", s.name, s.file, s.id);
+    }
+    Ok(())
+}
+
+/// `export` lines for a POSIX shell. Values are single-quoted; existing values are kept.
+fn print_env(dir: &Path) -> R<()> {
+    let al = project::autoload_for(dir);
+    let q = |s: &str| format!("'{}'", s.replace('\'', "'\\''"));
+    if let Some(req) = &al.node_require {
+        println!(
+            "export NODE_OPTIONS=\"${{NODE_OPTIONS:+$NODE_OPTIONS }}\"{}",
+            q(&format!("--require {req}"))
+        );
+    }
+    let is_python = [
+        "manage.py",
+        "pyproject.toml",
+        "requirements.txt",
+        "setup.py",
+        "Pipfile",
+    ]
+    .iter()
+    .any(|f| dir.join(f).exists());
+    if let (true, Some(py)) = (is_python, &al.python_dir) {
+        println!(
+            "export PYTHONPATH={}\"${{PYTHONPATH:+:$PYTHONPATH}}\"",
+            q(&py.display().to_string())
+        );
+    }
+    if let Some(sock) = std::env::var_os("DOPPELKEY_SOCK") {
+        println!("export DOPPELKEY_SOCK={}", q(&sock.to_string_lossy()));
     }
     Ok(())
 }

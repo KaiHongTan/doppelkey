@@ -135,6 +135,9 @@ pub fn plan_autoload(dir: &Path, a: &AutoLoad) -> (Vec<Change>, Vec<String>) {
     if let Some(req) = &a.node_require {
         let flag = format!("--require {req}");
         if is_node {
+            if req.starts_with('/') {
+                notes.push("the Node shim is referenced by an absolute path on this machine; run \"npm i -D doppelkey\" so teammates' scripts find it too".into());
+            }
             // npm and pnpm pass `node-options` from .npmrc to scripts as NODE_OPTIONS.
             let npmrc = dir.join(".npmrc");
             let cur = fs::read_to_string(&npmrc).unwrap_or_default();
@@ -341,15 +344,53 @@ pub fn autoload_for(dir: &Path) -> AutoLoad {
             "share/doppelkey/node/register.cjs",
             "shims/node/dist/register.cjs",
         )
-        .map(|p| p.display().to_string())
+        .map(|p| stable_copy(&p, "node/register.cjs").display().to_string())
     };
     let python_dir = find_shim(
         "DOPPELKEY_PYTHON_SHIM",
         "share/doppelkey/python",
         "shims/python/src",
-    );
+    )
+    .map(|p| stable_copy(&p, "python"));
     AutoLoad {
         node_require,
         python_dir,
     }
+}
+
+/// Copy a shim into the doppelkey config dir so auto-load lines keep working after an `npx`
+/// cache is cleaned or the binary moves. Falls back to the original path on any error.
+fn stable_copy(src: &Path, rel: &str) -> PathBuf {
+    let dest = crate::paths::config_dir().join("shims").join(rel);
+    if src.starts_with(crate::paths::config_dir()) {
+        return src.to_path_buf();
+    }
+    let ok = if src.is_dir() {
+        copy_dir(src, &dest).is_ok()
+    } else {
+        dest.parent().map(fs::create_dir_all).transpose().is_ok() && fs::copy(src, &dest).is_ok()
+    };
+    if ok {
+        dest
+    } else {
+        src.to_path_buf()
+    }
+}
+
+fn copy_dir(src: &Path, dest: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dest)?;
+    for e in fs::read_dir(src)? {
+        let e = e?;
+        let name = e.file_name();
+        if name == "__pycache__" {
+            continue;
+        }
+        let to = dest.join(&name);
+        if e.file_type()?.is_dir() {
+            copy_dir(&e.path(), &to)?;
+        } else {
+            fs::copy(e.path(), to)?;
+        }
+    }
+    Ok(())
 }
