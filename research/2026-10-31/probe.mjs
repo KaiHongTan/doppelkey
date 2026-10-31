@@ -1,0 +1,20 @@
+// Run under the shim with handles (and again unshimmed with real keys) to compare.
+import { sign as octoSign } from '@octokit/webhooks-methods';
+import { Webhook } from 'svix';
+import { hmac } from '@oslojs/crypto/hmac';
+import { SHA256 } from '@oslojs/crypto/sha2';
+import { sealData, unsealData } from 'iron-session';
+import { encode as naEncode, decode as naDecode } from 'next-auth/jwt';
+import { makeSignature, symmetricEncodeJWT, symmetricDecodeJWT } from 'better-auth/crypto';
+import { sign as honoSign } from 'hono/jwt';
+const S = process.env.JWT_SECRET, A = process.env.AUTH_SECRET, out = {}, err = {};
+const tryit = async (k, f) => { try { out[k] = await f(); } catch (e) { err[k] = e.message.slice(0, 140); } };
+await tryit('octokit', () => octoSign(S, '{"a":1}'));
+await tryit('svix', () => new Webhook('whsec_' + Buffer.from(S).toString('base64')).sign('msg_1', new Date(1700000000000), '{"a":1}'));
+await tryit('oslo', () => Buffer.from(hmac(SHA256, new TextEncoder().encode(S), new TextEncoder().encode('hello'))).toString('hex'));
+await tryit('hono', () => honoSign({ sub: 'u' }, S, 'HS256'));
+await tryit('betterAuthSig', () => makeSignature('hello', S));
+await tryit('betterAuthJWE', async () => { const t = await symmetricEncodeJWT({ sub: 'u' }, A, 'salt'); return t; });
+await tryit('ironSeal', () => sealData({ u: 'alice' }, { password: A, ttl: 0 }));
+await tryit('nextAuthV4', () => naEncode({ token: { sub: 'u' }, secret: A }));
+console.log(JSON.stringify({ out, err }));
