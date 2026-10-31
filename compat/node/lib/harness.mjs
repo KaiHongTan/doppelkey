@@ -37,13 +37,16 @@ export function tmpdir(tag = 'dk') {
  * Start a keeper. Default: the Node test keeper. DOPPELKEY_KEEPER_CMD overrides it (e.g. with
  * doppelkeyd in Milestone 2); it gets --vault/--socket/--audit appended.
  */
-export async function startKeeper({ vaultFile = VAULT_FILE } = {}) {
+/** True when the suite runs against doppelkeyd (DOPPELKEY_KEEPER_CMD) rather than the Node test keeper. */
+export const isRustKeeper = !!process.env.DOPPELKEY_KEEPER_CMD;
+
+export async function startKeeper({ vaultFile = VAULT_FILE, env = {} } = {}) {
   const dir = tmpdir('dk-keeper');
   fs.chmodSync(dir, 0o700);
   const sock = path.join(dir, 'k.sock');
   const audit = path.join(dir, 'audit.jsonl');
   const cmd = process.env.DOPPELKEY_KEEPER_CMD ? process.env.DOPPELKEY_KEEPER_CMD.split(' ') : [process.execPath, path.join(ROOT, 'compat/test-keeper/keeper.mjs')];
-  const child = spawn(cmd[0], [...cmd.slice(1), '--vault', vaultFile, '--socket', sock, '--audit', audit], { stdio: ['ignore', 'pipe', 'inherit'] });
+  const child = spawn(cmd[0], [...cmd.slice(1), '--vault', vaultFile, '--socket', sock, '--audit', audit], { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, ...env } });
   await new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('keeper did not start')), 10000);
     child.stdout.on('data', (d) => { if (String(d).includes('listening')) { clearTimeout(t); resolve(); } });
@@ -52,6 +55,7 @@ export async function startKeeper({ vaultFile = VAULT_FILE } = {}) {
   return {
     sock,
     audit,
+    pid: child.pid,
     auditEntries: () => (fs.existsSync(audit) ? fs.readFileSync(audit, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []),
     stop: () => new Promise((r) => { child.once('exit', r); child.kill('SIGTERM'); }),
   };

@@ -53,3 +53,32 @@ jobs:
         run: |
           npm ci
           DOPPELKEY_TEST_RUNTIME="$(which bun)" node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs
+
+  rust:
+    name: doppelkeyd / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --all
+      - run: cargo build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build the shim
+        working-directory: shims/node
+        run: npm ci && npm run build
+      - name: Compatibility suite against doppelkeyd (runs as a non-root user, so the memory test applies)
+        working-directory: compat/node
+        run: |
+          npm ci
+          DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs
