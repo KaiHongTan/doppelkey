@@ -1,0 +1,25 @@
+name: Library or framework support
+description: A library that should work with doppelkey but doesn't (or that you verified works)
+labels: [compatibility]
+body:
+  - type: input
+    id: library
+    attributes:
+      label: Library and version
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Fails with a doppelkey error
+        - Gives wrong results silently
+        - Works (please add it to the compatibility table)
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: How the library uses the key (which crypto API), and a minimal example with fake keys.

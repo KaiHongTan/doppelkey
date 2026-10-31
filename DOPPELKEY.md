@@ -3,6 +3,8 @@
 > **For coding agents: start here.** This file is the complete brief for building doppelkey. It holds the research, locked decisions, specs, milestones with acceptance criteria, and the working prototype code (Appendix A). Read sections 1 to 6 before writing code. Then start with Milestone 1.
 >
 > Last updated: 1 November 2026.
+>
+> **Implementation status (31 Oct 2026):** Milestones 1–4 are built and tested, plus Ruby and Java shims beyond the plan. See `README.md` for the current layout and usage, the milestone notes in section 14 for what changed from this plan and why, and `docs/research.md` for the research behind those changes.
 
 ## 0. Ground rules for anyone working on this repo
 
@@ -112,6 +114,8 @@ Rust over Node/Go for the keeper: V8 strings can't be wiped (agent-vault lists t
 5. **macOS and Linux first.** Windows after v0.1.
 
 ## 6. Repository layout
+
+*As built, the layout also has `shims/ruby`, `shims/java`, `compat/{test-keeper,python,ruby,java,fixtures}`, `packaging/` and `research/`; see the table in `README.md`.*
 
 ```
 crates/

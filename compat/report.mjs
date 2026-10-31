@@ -26,12 +26,22 @@ function py(label, env = {}) {
     rows.push({ suite: `python:${m[2]}`, name: m[1].replace(/^test_/, '').replace(/_/g, ' '), [label]: m[3] === 'ok' ? 'pass' : m[3].startsWith('skipped') ? 'skip' : 'FAIL' });
   }
 }
+function rb(label, env = {}) {
+  const dir = path.join(ROOT, 'compat/ruby');
+  if (!fs.existsSync(path.join(dir, '.gems'))) return;
+  const r = spawnSync('ruby', ['test_compat.rb', '-v'], { cwd: dir, env: { ...process.env, ...env }, encoding: 'utf8' });
+  for (const m of r.stdout.matchAll(/^RubyShimTest#test_(\w+) = [\d.]+ s = ([.FES])$/gm)) {
+    rows.push({ suite: 'ruby', name: m[1].replace(/_/g, ' '), [label]: m[2] === '.' ? 'pass' : m[2] === 'S' ? 'skip' : 'FAIL' });
+  }
+}
 const rust = path.join(ROOT, 'target/debug/doppelkeyd');
 tap('node-keeper', path.join(ROOT, 'compat/node'));
 py('node-keeper');
+rb('node-keeper');
 if (fs.existsSync(rust)) {
   tap('doppelkeyd', path.join(ROOT, 'compat/node'), { DOPPELKEY_KEEPER_CMD: `${rust} insecure-test-keeper` });
   py('doppelkeyd', { DOPPELKEY_KEEPER_CMD: `${rust} insecure-test-keeper` });
+  rb('doppelkeyd', { DOPPELKEY_KEEPER_CMD: `${rust} insecure-test-keeper` });
 }
 const merged = new Map();
 for (const r of rows) {

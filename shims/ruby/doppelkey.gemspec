@@ -6,6 +6,6 @@ Gem::Specification.new do |s|
   s.authors = ["doppelkey contributors"]
   s.license = "Apache-2.0"
   s.homepage = "https://github.com/KaiHongTan/dopplekey"
-  s.files = Dir["lib/**/*.rb"]
+  s.files = Dir["lib/**/*.rb"] + ["LICENSE", "README.md"]
   s.required_ruby_version = ">= 3.0"
 end
