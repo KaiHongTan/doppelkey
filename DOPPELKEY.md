@@ -286,10 +286,11 @@ Rough estimate: a typical SaaS `.env` holds 10 to 25 secrets, of which 3 to 6 ar
   - *Status (31 Oct 2026): met with the `doppelkey` binary (the `npx` launcher arrives with Milestone 4 packaging). Next.js 16 + @auth/core 0.41: `doppelkey init` then `npm run dev`; the token decrypts on a real-key server. Django 6.1: `doppelkey init` then `manage.py runserver`; signatures verify under the real `SECRET_KEY`. `eject` restores `.env` byte for byte (automated in `compat/node/test/cli.test.mjs`).*
 
 ### Milestone 4: agent integrations and launch
-- [ ] Claude Code plugin (skill, `SessionStart` hook, `.mcp.json`); generic SKILL.md for Codex and others; `doppelkey mcp`.
-- [ ] README, `llms.txt`, comparison page, 60-second demo, CI-generated compatibility table.
-- [ ] Releases via cargo-dist (Homebrew tap, installers) plus npm and PyPI; macOS binary signed and notarized.
+- [x] Claude Code plugin (skill, `SessionStart` hook, `.mcp.json`); generic SKILL.md for Codex and others; `doppelkey mcp`. *`integrations/`; plugin and marketplace pass `claude plugin validate`.*
+- [x] README, `llms.txt`, comparison page, 60-second demo, CI-generated compatibility table. *`docs/comparison.md`, `docs/demo.sh` (a scripted demo, not a video), `compat/report.mjs` → `docs/compatibility.md`.*
+- [x] Releases via cargo-dist (Homebrew tap, installers) plus npm and PyPI; macOS binary signed and notarized. *A hand-written `.github/workflows/release.yml` replaced cargo-dist, because archives must also bundle the shims. It publishes the npm launcher + per-platform packages and the PyPI wheel. `install.sh` and a Homebrew formula are included. Signing and notarization run when Apple secrets are configured (`packaging/macos-sign.sh`); not yet exercised.*
 - **Done when:** in a fresh Claude Code session on a sample repo with a plain `.env`, the plugin proposes `init`, and after it the agent can run the app and tests but cannot print any real secret.
+  - *Status (31 Oct 2026): the second half is automated in `compat/node/test/agent.test.mjs`. After `init`, the app and tests run; `.env`, the environment, a grep of the project, the vault file, `eject`, policy loosening, export-like keeper ops, MCP tools and (as a non-root user) the keeper's memory reveal no secret. The hook's suggestion is tested (`integrations.test.mjs`). A live Claude Code session proposing `init` has not been run (it needs credentials).*
 
 ## 15. Open questions
 
