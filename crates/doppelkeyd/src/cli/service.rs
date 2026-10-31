@@ -37,17 +37,63 @@ pub fn unit_path() -> PathBuf {
     }
 }
 
+/// Settings that must reach a keeper started by systemd/launchd (they don't inherit the shell).
+fn carried_env() -> Vec<(&'static str, String)> {
+    ["DOPPELKEY_SOCK", "DOPPELKEY_HOME", "DOPPELKEY_ASKPASS"]
+        .into_iter()
+        .filter_map(|k| {
+            std::env::var(k)
+                .ok()
+                .filter(|v| !v.is_empty())
+                .map(|v| (k, v))
+        })
+        .collect()
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 pub fn systemd_unit(bin: &str) -> String {
+    let env: String = carried_env()
+        .iter()
+        .map(|(k, v)| format!("Environment=\"{k}={}\"\n", v.replace('"', "\\\"")))
+        .collect();
     format!(
-        "[Unit]\nDescription=doppelkey keeper (holds app keys; never exports them)\nDocumentation=https://github.com/KaiHongTan/dopplekey\n\n[Service]\nType=simple\nExecStart={bin} serve\nRestart=on-failure\nUMask=0077\nNoNewPrivileges=yes\nLockPersonality=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nPrivateTmp=yes\nUnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT\n\n[Install]\nWantedBy=default.target\n"
+        "[Unit]\nDescription=doppelkey keeper (holds app keys; never exports them)\nDocumentation=https://github.com/KaiHongTan/dopplekey\n\n[Service]\nType=simple\nExecStart={bin} serve\n{env}Restart=on-failure\nUMask=0077\nNoNewPrivileges=yes\nLockPersonality=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nPrivateTmp=yes\nUnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT\n\n[Install]\nWantedBy=default.target\n"
     )
 }
 
 pub fn launchd_plist(bin: &str) -> String {
+    let env = carried_env();
+    let env_xml = if env.is_empty() {
+        String::new()
+    } else {
+        let pairs: String = env
+            .iter()
+            .map(|(k, v)| format!("<key>{k}</key><string>{}</string>", xml_escape(v)))
+            .collect();
+        format!("  <key>EnvironmentVariables</key><dict>{pairs}</dict>\n")
+    };
     format!(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>Label</key><string>{LABEL}</string>\n  <key>ProgramArguments</key><array><string>{bin}</string><string>serve</string></array>\n  <key>RunAtLoad</key><true/>\n  <key>KeepAlive</key><true/>\n  <key>ProcessType</key><string>Background</string>\n  <key>StandardErrorPath</key><string>{}</string>\n</dict>\n</plist>\n",
-        paths::state_dir().join("doppelkeyd.log").display()
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n  <key>Label</key><string>{LABEL}</string>\n  <key>ProgramArguments</key><array><string>{}</string><string>serve</string></array>\n{env_xml}  <key>RunAtLoad</key><true/>\n  <key>KeepAlive</key><true/>\n  <key>ProcessType</key><string>Background</string>\n  <key>StandardErrorPath</key><string>{}</string>\n</dict>\n</plist>\n",
+        xml_escape(bin),
+        xml_escape(&paths::state_dir().join("doppelkeyd.log").display().to_string())
     )
+}
+
+/// Wait until the keeper answers on its socket.
+fn wait_for_socket(ms: u64) -> bool {
+    for _ in 0..(ms / 100) {
+        if std::os::unix::net::UnixStream::connect(paths::socket_path()).is_ok() {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    false
 }
 
 fn run(cmd: &str, args: &[&str]) -> Result<(), String> {
@@ -68,12 +114,16 @@ fn run(cmd: &str, args: &[&str]) -> Result<(), String> {
 }
 
 /// Install and start. Returns a description of what was done.
+/// DOPPELKEY_SERVICE=detached skips systemd/launchd (tests, containers, CI).
 pub fn install() -> Result<String, String> {
+    if std::env::var("DOPPELKEY_SERVICE").as_deref() == Ok("detached") {
+        return start_detached();
+    }
     let bin = keeper_binary()?;
     let bin_s = bin.display().to_string();
     let unit = unit_path();
     fs::create_dir_all(unit.parent().unwrap()).map_err(|e| e.to_string())?;
-    if cfg!(target_os = "macos") {
+    let started = if cfg!(target_os = "macos") {
         fs::create_dir_all(paths::state_dir()).map_err(|e| e.to_string())?;
         fs::write(&unit, launchd_plist(&bin_s)).map_err(|e| e.to_string())?;
         let uid = unsafe { libc::getuid() };
@@ -85,18 +135,28 @@ pub fn install() -> Result<String, String> {
                 &format!("gui/{uid}"),
                 &unit.display().to_string(),
             ],
-        )?;
-        return Ok(format!("installed launchd agent {}", unit.display()));
-    }
-    fs::write(&unit, systemd_unit(&bin_s)).map_err(|e| e.to_string())?;
-    match run("systemctl", &["--user", "daemon-reload"])
-        .and_then(|_| run("systemctl", &["--user", "enable", "--now", UNIT]))
-    {
-        Ok(()) => Ok(format!("installed systemd user service {}", unit.display())),
+        )
+        .map(|_| "launchd agent")
+    } else {
+        fs::write(&unit, systemd_unit(&bin_s)).map_err(|e| e.to_string())?;
+        run("systemctl", &["--user", "daemon-reload"])
+            .and_then(|_| run("systemctl", &["--user", "enable", "--now", UNIT]))
+            .map(|_| "systemd user service")
+    };
+    match started {
+        Ok(kind) if wait_for_socket(5000) => Ok(format!("installed {kind} {}", unit.display())),
+        Ok(kind) => {
+            let how = start_detached()?;
+            Ok(format!(
+                "installed {kind} {} but it did not answer on {}; {how}",
+                unit.display(),
+                paths::socket_path().display()
+            ))
+        }
         Err(e) => {
             let how = start_detached()?;
             Ok(format!(
-                "wrote {} but systemd is not available ({e}); {how}",
+                "wrote {} but the service manager is not available ({e}); {how}",
                 unit.display()
             ))
         }
@@ -187,4 +247,22 @@ pub fn stop_detached() -> Result<(), String> {
 
 pub fn installed() -> bool {
     unit_path().exists()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn service_definitions_carry_socket_and_home() {
+        std::env::set_var("DOPPELKEY_SOCK", "/tmp/a b/k.sock");
+        std::env::set_var("DOPPELKEY_HOME", "/tmp/<home>");
+        let unit = systemd_unit("/usr/local/bin/doppelkeyd");
+        assert!(unit.contains("Environment=\"DOPPELKEY_SOCK=/tmp/a b/k.sock\""));
+        assert!(unit.contains("ExecStart=/usr/local/bin/doppelkeyd serve"));
+        let plist = launchd_plist("/usr/local/bin/doppelkeyd");
+        assert!(plist.contains("<key>DOPPELKEY_HOME</key><string>/tmp/&lt;home&gt;</string>"));
+        std::env::remove_var("DOPPELKEY_SOCK");
+        std::env::remove_var("DOPPELKEY_HOME");
+    }
 }

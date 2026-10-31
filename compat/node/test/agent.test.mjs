@@ -24,7 +24,7 @@ before(() => {
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'a', private: true, scripts: { test: 'node test.js' } }));
   fs.writeFileSync(path.join(dir, 'test.js'), `const fs=require('fs'),c=require('crypto');for(const l of fs.readFileSync('.env','utf8').split('\\n')){const m=l.match(/^(\\w+)=(.*)$/);if(m)process.env[m[1]]=m[2]}
 console.log(c.createHmac('sha256',process.env.JWT_SECRET).update('t').digest('hex'))`);
-  env = { PATH: `${BIN}:${process.env.PATH}`, HOME: home, DOPPELKEY_HOME: path.join(home, 'dk'), DOPPELKEY_SOCK: path.join(home, 'k.sock'), DOPPELKEY_PASSPHRASE: 'human-only passphrase' };
+  env = { PATH: `${BIN}:${process.env.PATH}`, HOME: home, DOPPELKEY_HOME: path.join(home, 'dk'), DOPPELKEY_SOCK: path.join(home, 'k.sock'), DOPPELKEY_PASSPHRASE: 'human-only passphrase', DOPPELKEY_SERVICE: 'detached' };
   const init = sh('doppelkey', ['init', '--yes']);
   if (init.status !== 0) throw new Error(init.stdout + init.stderr);
   delete env.DOPPELKEY_PASSPHRASE; // the agent doesn't know it

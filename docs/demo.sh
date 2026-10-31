@@ -4,7 +4,7 @@
 #   sh docs/demo.sh
 set -eu
 DEMO="$(mktemp -d)"
-export HOME="$DEMO/home" DOPPELKEY_HOME="$DEMO/home/doppelkey" DOPPELKEY_SOCK="$DEMO/k.sock" DOPPELKEY_PASSPHRASE="demo passphrase"
+export HOME="$DEMO/home" DOPPELKEY_HOME="$DEMO/home/doppelkey" DOPPELKEY_SOCK="$DEMO/k.sock" DOPPELKEY_PASSPHRASE="demo passphrase" DOPPELKEY_SERVICE=detached
 mkdir -p "$HOME" "$DEMO/app" && cd "$DEMO/app"
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; sleep "${DEMO_PAUSE:-1}"; }
 
