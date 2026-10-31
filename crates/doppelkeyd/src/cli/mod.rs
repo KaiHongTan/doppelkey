@@ -883,6 +883,13 @@ fn run_cmd(cmd: &[String]) -> R<()> {
         let sep = if cur.is_empty() { "" } else { ":" };
         c.env("PYTHONPATH", format!("{}{sep}{cur}", py.display()));
     }
+    if let Some(rb) = &al.ruby_register {
+        let cur = std::env::var("RUBYOPT").unwrap_or_default();
+        c.env(
+            "RUBYOPT",
+            format!("{cur} -r{}", rb.display()).trim().to_string(),
+        );
+    }
     let e = c.exec();
     Err(format!("cannot run {}: {e}", cmd[0]))
 }
@@ -1005,6 +1012,12 @@ fn print_env(dir: &Path) -> R<()> {
         println!(
             "export PYTHONPATH={}\"${{PYTHONPATH:+:$PYTHONPATH}}\"",
             q(&py.display().to_string())
+        );
+    }
+    if let (true, Some(rb)) = (dir.join("Gemfile").exists(), &al.ruby_register) {
+        println!(
+            "export RUBYOPT=\"${{RUBYOPT:+$RUBYOPT }}\"{}",
+            q(&format!("-r{}", rb.display()))
         );
     }
     if let Some(sock) = std::env::var_os("DOPPELKEY_SOCK") {

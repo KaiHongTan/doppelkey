@@ -108,3 +108,28 @@ jobs:
           .venv/bin/pip install -q -r requirements.txt
           .venv/bin/python -m unittest -v test_compat
           DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" .venv/bin/python -m unittest -v test_compat
+
+  ruby:
+    name: ruby ${{ matrix.ruby }} / ubuntu
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.2", "3.3", "3.4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build
+      - name: Ruby compatibility suite (Node test keeper, then doppelkeyd)
+        working-directory: compat/ruby
+        run: |
+          gem install --install-dir .gems activesupport jwt --no-document
+          ruby test_compat.rb
+          DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" ruby test_compat.rb

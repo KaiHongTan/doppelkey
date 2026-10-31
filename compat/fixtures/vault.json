@@ -87,6 +87,15 @@
       "allow": [
         "hmac"
       ]
+    },
+    "SECRET_KEY_BASE": {
+      "id": "5b5b5b5b5b5b",
+      "form": "hex",
+      "value_b64": "Xrn7ErXc/0kkj6pFabQOxrE3Fy4pg3Z5gyx7E7l8CE1P4wmqEJ0rD6MA/lY3OPBQja1zMloYIk81X38MlYFQ7g==",
+      "allow": [
+        "pbkdf2",
+        "hmac"
+      ]
     }
   }
 }

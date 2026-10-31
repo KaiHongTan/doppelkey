@@ -56,6 +56,7 @@ jobs:
           cp target/${{ matrix.target }}/release/doppelkey target/${{ matrix.target }}/release/doppelkeyd "$NAME/bin/"
           cp shims/node/dist/register.cjs shims/node/dist/register.mjs "$NAME/share/doppelkey/node/"
           cp -R shims/python/src/doppelkey shims/python/src/sitecustomize.py "$NAME/share/doppelkey/python/"
+          mkdir -p "$NAME/share/doppelkey/ruby" && cp -R shims/ruby/lib/. "$NAME/share/doppelkey/ruby/"
           cp LICENSE README.md "$NAME/"
           tar czf "$NAME.tar.gz" "$NAME"
           shasum -a 256 "$NAME.tar.gz" > "$NAME.tar.gz.sha256"

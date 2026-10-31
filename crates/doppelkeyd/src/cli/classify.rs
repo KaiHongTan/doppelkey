@@ -91,10 +91,13 @@ const SECRET_NAME_PARTS: &[&str] = &[
     "WEBHOOK_KEY",
 ];
 /// Languages without a doppelkey shim yet: protecting these would break the app.
+/// Secrets doppelkey can't protect yet, and why.
 const UNSUPPORTED: &[(&str, &str)] = &[
-    ("SECRET_KEY_BASE", "Rails"),
-    ("RAILS_MASTER_KEY", "Rails"),
-    ("APP_KEY", "Laravel"),
+    (
+        "RAILS_MASTER_KEY",
+        "Rails credentials use a 16-byte AES key, too short to hold a handle",
+    ),
+    ("APP_KEY", "Laravel (PHP) has no doppelkey shim yet"),
 ];
 
 fn allow(ops: &[&str]) -> Vec<String> {
@@ -150,8 +153,8 @@ pub fn classify(name: &str, value: &str, others: &[(String, String)]) -> Decisio
     if !doppelkey_proto::handle::ids_in_text(value).is_empty() {
         return Decision::Skip("already a doppelkey handle".into());
     }
-    if let Some((_, lang)) = UNSUPPORTED.iter().find(|(n, _)| upper == *n) {
-        return Decision::Skip(format!("{lang} has no doppelkey shim yet"));
+    if let Some((_, why)) = UNSUPPORTED.iter().find(|(n, _)| upper == *n) {
+        return Decision::Skip((*why).to_string());
     }
     if upper == "AWS_SECRET_ACCESS_KEY" {
         let akid = others
@@ -291,7 +294,8 @@ mod tests {
         assert!(skip("STRIPE_SECRET_KEY", "sk_live_abc123abc123"));
         assert!(skip("DATABASE_URL", "postgres://u:p@h/db"));
         assert!(skip("DB_PASSWORD", "hunter2hunter2"));
-        assert!(skip("SECRET_KEY_BASE", "abcdef0123456789abcdef"));
+        assert!(skip("RAILS_MASTER_KEY", "0123456789abcdef0123456789abcdef"));
+        assert_eq!(plan("SECRET_KEY_BASE", &"ab".repeat(64)).form, Form::Hex);
         assert!(skip("NODE_ENV", "development"));
         assert!(skip(
             "JWT_SECRET",

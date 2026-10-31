@@ -124,6 +124,8 @@ pub struct AutoLoad {
     /// `--require` argument for Node: "doppelkey/register" or an absolute path.
     pub node_require: Option<String>,
     pub python_dir: Option<PathBuf>,
+    /// Path of the Ruby shim's register.rb.
+    pub ruby_register: Option<PathBuf>,
 }
 
 /// Plan auto-load edits for the runners this project uses.
@@ -244,6 +246,26 @@ pub fn plan_autoload(dir: &Path, a: &AutoLoad) -> (Vec<Change>, Vec<String>) {
             }
         }
     }
+    // Ruby: Rails loads config/boot.rb for every command (server, console, tests).
+    if has("Gemfile") {
+        match (&a.ruby_register, has("config/boot.rb")) {
+            (Some(rb), true) => {
+                let p = dir.join("config/boot.rb");
+                let cur = fs::read_to_string(&p).unwrap_or_default();
+                if !cur.contains("doppelkey") {
+                    let line = format!(
+                        "begin; require \"{}\"; rescue LoadError; warn \"doppelkey: Ruby shim not found; crypto with handles will fail. Run 'doppelkey doctor'.\"; end # added by doppelkey init\n",
+                        rb.display()
+                    );
+                    // Keep magic comments (frozen_string_literal, encoding) first: they only work before any code.
+                    let split = cur.lines().take_while(|l| l.starts_with('#') || l.trim().is_empty()).map(|l| l.len() + 1).sum::<usize>().min(cur.len());
+                    changes.push(Change { path: p, new_content: format!("{}{line}{}", &cur[..split], &cur[split..]), existed: true, inserted: None, purpose: "Rails commands load the Ruby shim".into() });
+                }
+            }
+            (Some(_), false) => notes.push("Ruby project without config/boot.rb: run it with \"doppelkey run -- ruby ...\" or eval \"$(doppelkey env)\"".into()),
+            (None, _) => notes.push("Ruby shim not found: set DOPPELKEY_RUBY_SHIM".into()),
+        }
+    }
     // Note for coding agents.
     let note_file = if has("CLAUDE.md") && !has("AGENTS.md") {
         "CLAUDE.md"
@@ -352,9 +374,16 @@ pub fn autoload_for(dir: &Path) -> AutoLoad {
         "shims/python/src",
     )
     .map(|p| stable_copy(&p, "python"));
+    let ruby_register = find_shim(
+        "DOPPELKEY_RUBY_SHIM",
+        "share/doppelkey/ruby",
+        "shims/ruby/lib",
+    )
+    .map(|p| stable_copy(&p, "ruby").join("doppelkey/register.rb"));
     AutoLoad {
         node_require,
         python_dir,
+        ruby_register,
     }
 }
 

@@ -102,3 +102,34 @@ print(json.dumps({'sig': hmac.new(key, b'value', 'sha256').hexdigest(), 'raw': h
   const pth = spawnSync('find', [path.join(pdir, '.venv'), '-name', 'doppelkey.pth'], { encoding: 'utf8' }).stdout.trim();
   assert.equal(pth, '', '.pth removed by eject');
 });
+
+test('Rails-style project: init loads the Ruby shim from config/boot.rb; eject restores it', { skip: missing || (spawnSync('ruby', ['--version']).status !== 0 && 'no ruby') }, () => {
+  const rdir = tmpdir('dk-cli-rails');
+  const skb = crypto.randomBytes(64).toString('hex');
+  const ENVTXT = `SECRET_KEY_BASE=${skb}\nRAILS_ENV=development\n`;
+  const BOOT = '# frozen_string_literal: true\n\nENV["BUNDLE_GEMFILE"] ||= File.expand_path("../Gemfile", __dir__)\n';
+  fs.writeFileSync(path.join(rdir, '.env'), ENVTXT);
+  fs.writeFileSync(path.join(rdir, 'Gemfile'), 'source "https://rubygems.org"\n');
+  fs.mkdirSync(path.join(rdir, 'config'));
+  fs.writeFileSync(path.join(rdir, 'config/boot.rb'), BOOT);
+  // What Rails does with secret_key_base: PBKDF2 key generation, then HMAC (MessageVerifier).
+  const script = `require "./config/boot"; require "openssl"
+skb = File.read(".env")[/SECRET_KEY_BASE=(.*)/, 1]
+key = OpenSSL::PKCS5.pbkdf2_hmac(skb, "signed cookie", 1000, 64, OpenSSL::Digest::SHA256.new)
+puts OpenSSL::HMAC.hexdigest("SHA256", key, "payload")`;
+  const rb = () => spawnSync('ruby', ['-e', script], { cwd: rdir, env, encoding: 'utf8' });
+  const plain = rb();
+  assert.equal(plain.status, 0, plain.stderr);
+  const init = spawnSync('doppelkey', ['init', '--yes'], { cwd: rdir, env, encoding: 'utf8' });
+  assert.equal(init.status, 0, init.stdout + init.stderr);
+  const boot = fs.readFileSync(path.join(rdir, 'config/boot.rb'), 'utf8');
+  assert.match(boot, /^# frozen_string_literal: true\n\nbegin; require ".*register\.rb"; rescue LoadError/);
+  assert.ok(!fs.readFileSync(path.join(rdir, '.env'), 'utf8').includes(skb));
+  const shimmed = rb();
+  assert.equal(shimmed.status, 0, shimmed.stderr);
+  assert.equal(shimmed.stdout, plain.stdout, 'same HMAC through the keeper');
+  const ej = spawnSync('doppelkey', ['eject'], { cwd: rdir, env: { ...env, DOPPELKEY_ASKPASS: '/bin/true' }, encoding: 'utf8' });
+  assert.equal(ej.status, 0, ej.stderr);
+  assert.equal(fs.readFileSync(path.join(rdir, '.env'), 'utf8'), ENVTXT);
+  assert.equal(fs.readFileSync(path.join(rdir, 'config/boot.rb'), 'utf8'), BOOT);
+});
