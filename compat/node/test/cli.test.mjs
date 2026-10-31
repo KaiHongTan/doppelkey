@@ -76,3 +76,29 @@ test('init, normal npm start, doctor, eject', { skip: missing }, () => {
   assert.equal(fs.readFileSync(path.join(dir, '.env'), 'utf8'), ENV, '.env restored byte for byte');
   for (const f of ['.npmrc', 'AGENTS.md', '.claude', '.doppelkey']) assert.ok(!fs.existsSync(path.join(dir, f)), `${f} removed`);
 });
+
+test('Python project: init writes a venv .pth; plain `python app.py` then signs through the keeper', { skip: missing || (spawnSync('python3', ['--version']).status !== 0 && 'no python3') }, () => {
+  const pdir = tmpdir('dk-cli-py');
+  const ENVTXT = 'SECRET_KEY=django-insecure-0123456789abcdefghijklmnop\nDEBUG=1\n';
+  fs.writeFileSync(path.join(pdir, '.env'), ENVTXT);
+  fs.writeFileSync(path.join(pdir, 'manage.py'), '');
+  fs.writeFileSync(path.join(pdir, 'app.py'), `import hashlib, hmac, json
+env = dict(l.split('=', 1) for l in open('.env').read().splitlines() if '=' in l)
+key = hashlib.sha256(b'django.core.signing' + b'signer' + env['SECRET_KEY'].encode()).digest()  # Django-style derivation
+print(json.dumps({'sig': hmac.new(key, b'value', 'sha256').hexdigest(), 'raw': hmac.new(env['SECRET_KEY'].encode(), b'x', 'sha1').hexdigest()}))
+`);
+  assert.equal(spawnSync('python3', ['-m', 'venv', '--without-pip', '.venv'], { cwd: pdir }).status, 0);
+  const py = (extra = {}) => spawnSync(path.join(pdir, '.venv/bin/python'), ['app.py'], { cwd: pdir, env: { ...env, ...extra }, encoding: 'utf8' });
+  const plain = JSON.parse(py().stdout);
+  const init = spawnSync('doppelkey', ['init', '--yes'], { cwd: pdir, env, encoding: 'utf8' });
+  assert.equal(init.status, 0, init.stdout + init.stderr);
+  assert.match(init.stdout, /Python in \.venv loads the shim/);
+  const shimmed = py();
+  assert.equal(shimmed.status, 0, shimmed.stderr);
+  assert.deepEqual(JSON.parse(shimmed.stdout), plain);
+  const ej = spawnSync('doppelkey', ['eject'], { cwd: pdir, env: { ...env, DOPPELKEY_ASKPASS: '/bin/true' }, encoding: 'utf8' });
+  assert.equal(ej.status, 0, ej.stderr);
+  assert.equal(fs.readFileSync(path.join(pdir, '.env'), 'utf8'), ENVTXT);
+  const pth = spawnSync('find', [path.join(pdir, '.venv'), '-name', 'doppelkey.pth'], { encoding: 'utf8' }).stdout.trim();
+  assert.equal(pth, '', '.pth removed by eject');
+});

@@ -182,6 +182,19 @@ const ops = {
       return { result: { out: Buffer.concat([c.update(data), c.final()]).toString('base64') } };
     } catch (e) { throw new KErr(req.mode === 'decrypt' ? 'crypto_error' : 'bad_request', req.mode === 'decrypt' ? 'AES-CBC decryption failed' : e.message); }
   },
+  // RFC 7638 thumbprint of the key as an "oct" JWK: a public identifier (used as a JWT `kid`).
+  // The keeper builds the JSON itself, so this can't be turned into a hash-of-anything oracle.
+  jwk_thumbprint(req) {
+    const hash = needHash(req.hash);
+    if (req.prefix !== undefined || req.key_encoding !== undefined) throw new KErr('bad_request', 'jwk_thumbprint takes a bare handle');
+    const ids = parseHandle(req.handle);
+    if (!ids) throw new KErr('unknown_handle', 'not a valid doppelkey handle', 'doppelkey doctor');
+    const parts = ids.map((id) => keys.get(id));
+    if (parts.some((p) => !p)) throw new KErr('unknown_handle', 'this handle is not in the keeper', 'doppelkey doctor');
+    const key = Buffer.concat(parts.map((p) => p.key));
+    const json = `{"k":"${key.toString('base64url')}","kty":"oct"}`;
+    return { result: { digest: crypto.createHash(hash).update(json).digest('base64') } };
+  },
   status() {
     return { result: { version: VERSION, protocol: 1, keys: Object.keys(vault.keys) } };
   },

@@ -529,6 +529,40 @@ pub fn run(state: &mut State, req: &Value) -> Result<(Value, AuditInfo), KErr> {
                 },
             ))
         }
+        "jwk_thumbprint" => {
+            // RFC 7638 thumbprint of the key as an "oct" JWK: a public identifier (a JWT `kid`).
+            // The keeper builds the JSON itself, so this is not a hash-of-anything oracle.
+            let h = hash_field(req, "hash")?;
+            if req.get("prefix").is_some() || req.get("key_encoding").is_some() {
+                return Err(bad("jwk_thumbprint takes a bare handle"));
+            }
+            let ids = parse_handle(str_field(req, "handle")).ok_or_else(|| KErr {
+                code: ErrorCode::UnknownHandle,
+                message: "not a valid doppelkey handle".into(),
+                hint: Some("doppelkey doctor".into()),
+            })?;
+            let mut key = Zeroizing::new(Vec::new());
+            let mut root = None;
+            for id in &ids {
+                let e = state.keys.get(id).ok_or_else(|| KErr {
+                    code: ErrorCode::UnknownHandle,
+                    message: "this handle is not in the keeper".into(),
+                    hint: Some("doppelkey doctor".into()),
+                })?;
+                key.extend_from_slice(e.key.bytes());
+                root.get_or_insert_with(|| e.root.clone().unwrap_or_else(|| e.name.clone()));
+            }
+            let b64url = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&*key);
+            let json = Zeroizing::new(format!("{{\"k\":\"{b64url}\",\"kty\":\"oct\"}}"));
+            let d = crypto::digest(h, json.as_bytes());
+            Ok((
+                json!({ "digest": B64.encode(&*d) }),
+                AuditInfo {
+                    key: root,
+                    scope: None,
+                },
+            ))
+        }
         "aes_cbc" => {
             let r = resolve(state, req, "aes_cbc")?;
             check_aes(&r.key, req)?;

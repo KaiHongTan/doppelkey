@@ -82,3 +82,29 @@ jobs:
         run: |
           npm ci
           DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs
+
+  python:
+    name: python ${{ matrix.python }} / ubuntu
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build
+      - name: Python compatibility suite (Node test keeper, then doppelkeyd)
+        working-directory: compat/python
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt
+          .venv/bin/python -m unittest -v test_compat
+          DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" .venv/bin/python -m unittest -v test_compat

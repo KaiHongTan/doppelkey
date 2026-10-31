@@ -870,10 +870,7 @@ fn run_cmd(cmd: &[String]) -> R<()> {
     c.args(&cmd[1..]);
     if let Some(req) = &al.node_require {
         let cur = std::env::var("NODE_OPTIONS").unwrap_or_default();
-        c.env(
-            "NODE_OPTIONS",
-            format!("{cur} --require {req}").trim(),
-        );
+        c.env("NODE_OPTIONS", format!("{cur} --require {req}").trim());
     }
     if let Some(py) = &al.python_dir {
         let cur = std::env::var("PYTHONPATH").unwrap_or_default();

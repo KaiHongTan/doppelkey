@@ -6,6 +6,7 @@ import { isMainThread, workerData } from 'node:worker_threads';
 import { WORKER_MARK, keeperStats, socketPath } from './keeper';
 import { installNodeCrypto } from './node-crypto';
 import { installWebCrypto } from './webcrypto';
+import { installHash } from './hash';
 import { installPureJs } from './purejs';
 import { refOfKeyMaterial } from './handle';
 
@@ -19,6 +20,7 @@ function main() {
   if (process.env.DOPPELKEY_SHIM === 'off') return;
   installNodeCrypto();
   installWebCrypto();
+  installHash();
   const purejs = installPureJs();
   g[STATE] = Object.freeze({
     version: __VERSION__,
