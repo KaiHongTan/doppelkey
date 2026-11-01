@@ -17,6 +17,6 @@ public final class DoppelkeyException extends RuntimeException {
     public String code() { return code; }
 
     static DoppelkeyException unsupported(String what) {
-        return new DoppelkeyException("unsupported", what + " is not supported with a doppelkey handle yet, so the call was refused instead of computing with the handle text", "See docs/research.md or open an issue.");
+        return new DoppelkeyException("unsupported", what + " is not supported with a doppelkey handle yet, so the call was refused instead of computing with the handle text", "If you need it, open an issue: https://github.com/KaiHongTan/dopplekey/issues");
     }
 }

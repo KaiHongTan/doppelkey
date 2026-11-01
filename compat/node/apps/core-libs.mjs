@@ -1,4 +1,4 @@
-// Milestone 1 libraries, used exactly as their docs say. Nothing here knows about doppelkey.
+// Core libraries (JWT, cookies, Stripe, AWS), used exactly as their docs say. Nothing here knows about doppelkey.
 import { createHmac, createHash } from 'node:crypto'; // ESM named import (tests syncBuiltinESMExports)
 import { Readable } from 'node:stream';
 import jwt from 'jsonwebtoken';

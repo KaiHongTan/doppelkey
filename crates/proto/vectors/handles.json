@@ -177,7 +177,7 @@
     {
       "input": "KH1:a1b2c3d4e5f60718.......................",
       "valid": false,
-      "note": "prototype handle (KH1) is not v1"
+      "note": "an old KH1-style handle is not a v1 handle"
     }
   ]
 }

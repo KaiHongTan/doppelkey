@@ -1,4 +1,4 @@
-//! doppelkey keeper (`doppelkeyd`) and CLI (`doppelkey`). See DOPPELKEY.md and docs/protocol.md.
+//! doppelkey keeper (`doppelkeyd`) and CLI (`doppelkey`). See docs/design.md and docs/protocol.md.
 
 pub mod audit;
 pub mod cli;

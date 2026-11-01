@@ -1,5 +1,5 @@
 // Plays AWS: rebuilds the SigV4 (or SigV2) canonical request and checks the signature with the
-// real secret, the way AWS does. Ported from prototype/aws_oracle.mjs.
+// real secret, the way AWS does.
 import crypto from 'node:crypto';
 
 const hmac = (k, d) => crypto.createHmac('sha256', k).update(d).digest();

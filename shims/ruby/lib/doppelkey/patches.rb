@@ -38,7 +38,7 @@ module Doppelkey
   end
 
   def unsupported(what)
-    raise Doppelkey::Error.new("unsupported", "#{what} is not supported with a doppelkey handle yet, so the call was refused instead of computing with the handle text", "See docs/research.md or open an issue.")
+    raise Doppelkey::Error.new("unsupported", "#{what} is not supported with a doppelkey handle yet, so the call was refused instead of computing with the handle text", "If you need it, open an issue: https://github.com/KaiHongTan/dopplekey/issues")
   end
 
   def remote_hmac(ref, alg, data)

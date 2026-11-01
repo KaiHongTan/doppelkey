@@ -35,7 +35,7 @@ export function tmpdir(tag = 'dk') {
 
 /**
  * Start a keeper. Default: the Node test keeper. DOPPELKEY_KEEPER_CMD overrides it (e.g. with
- * doppelkeyd in Milestone 2); it gets --vault/--socket/--audit appended.
+ * doppelkeyd); it gets --vault/--socket/--audit appended.
  */
 /** True when the suite runs against doppelkeyd (DOPPELKEY_KEEPER_CMD) rather than the Node test keeper. */
 export const isRustKeeper = !!process.env.DOPPELKEY_KEEPER_CMD;

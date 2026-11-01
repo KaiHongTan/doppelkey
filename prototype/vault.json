@@ -1,7 +1,0 @@
-{
-  "KH1:a1b2c3d4e5f60718.......................": {"key": "real-jwt-secret-3f9c1e7a5b2d8c4e6f1a9b3d7e5c2a8f", "allow": ["hmac"]},
-  "KH1:0f1e2d3c4b5a6978.......................": {"key": "real-cookie-secret-8e2b4d6f1a3c5e7b9d0f2a4c6e8b1d3f", "allow": ["hmac"]},
-  "KH1:1122334455667788.......................": {"key": "whsec_realStripeSigningSecret1234567890abcd", "allow": ["hmac"]},
-  "KH1:99aabbccddeeff00.......................": {"key": "real-auth-secret-for-hkdf-7c1e3a5b9d2f4e6a8c0b", "allow": ["hkdf"]},
-  "KH1:a0a0b1b1c2c2d3d3....................": {"key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "allow": ["hmac"], "profile": "aws-sigv4", "accessKeyId": "AKIAIOSFODNN7EXAMPLE", "services": ["s3"], "sigv2": true}
-}

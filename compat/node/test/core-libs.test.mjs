@@ -1,4 +1,4 @@
-// Milestone 1 acceptance: jsonwebtoken, jose, cookie-signature, stripe (sync + async) and the
+// Core libraries: jsonwebtoken, jose, cookie-signature, stripe (sync + async) and the
 // AWS SDK v3 (S3) run unchanged with handles; every output verifies under the real key; the
 // app's heap and environment hold none of the real keys or derived signing keys.
 import { test, before, after } from 'node:test';
@@ -15,7 +15,7 @@ const AWS_ENV = { AWS_ACCESS_KEY_ID: 'AKIAIOSFODNN7EXAMPLE', AWS_REGION: 'ap-sou
 
 before(async () => {
   keeper = await startKeeper();
-  run = runApp('m1.mjs', { keeper, heap: true, env: { ...AWS_ENV, STRIPE_PAYLOAD: payload, STRIPE_HEADER: await stripeHeader(payload), STRIPE_HEADER_B64: await stripeHeader(payload, 'whsec_' + real('STRIPE_WEBHOOK_SECRET_B64').toString('base64')) } });
+  run = runApp('core-libs.mjs', { keeper, heap: true, env: { ...AWS_ENV, STRIPE_PAYLOAD: payload, STRIPE_HEADER: await stripeHeader(payload), STRIPE_HEADER_B64: await stripeHeader(payload, 'whsec_' + real('STRIPE_WEBHOOK_SECRET_B64').toString('base64')) } });
 });
 after(() => keeper?.stop());
 

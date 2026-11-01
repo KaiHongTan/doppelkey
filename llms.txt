@@ -20,5 +20,5 @@ Facts for agents working in a repo that uses doppelkey:
 
 ## Optional
 
-- [Design brief](https://github.com/KaiHongTan/dopplekey/blob/main/DOPPELKEY.md): decisions, milestones, threat model
-- [Research notes](https://github.com/KaiHongTan/dopplekey/blob/main/docs/research.md)
+- [Design](https://github.com/KaiHongTan/dopplekey/blob/main/docs/design.md): architecture and design decisions
+- [Background research](https://github.com/KaiHongTan/dopplekey/blob/main/docs/research.md)

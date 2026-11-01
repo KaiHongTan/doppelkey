@@ -1,5 +1,5 @@
 // Writes crates/proto/vectors/handles.json: inputs as an app would pass them as a key, and
-// what a shim must recognise. Until crates/proto exists (Milestone 2) this is the generator.
+// what a shim must recognise. Run after changing the handle format; Rust, Node and Python tests read it.
 import fs from 'node:fs';
 import { longCore, compactCore, crc } from './handles.mjs';
 
@@ -30,7 +30,7 @@ const vectors = [
   v(`dk1:NOT-A-SECRET-load-doppelkey-shimX${id1}:${crc(id1)}`, no, 'label typo'),
   v('dk1:', no, 'marker only'),
   v('real-jwt-secret-3f9c1e7a5b2d8c4e6f1a9b3d7e5c2a8f', no, 'an ordinary secret'),
-  v('KH1:a1b2c3d4e5f60718.......................', no, 'prototype handle (KH1) is not v1'),
+  v('KH1:a1b2c3d4e5f60718.......................', no, 'an old KH1-style handle is not a v1 handle'),
 ];
 fs.mkdirSync(new URL('../../crates/proto/vectors/', import.meta.url), { recursive: true });
 fs.writeFileSync(new URL('../../crates/proto/vectors/handles.json', import.meta.url), JSON.stringify({ format: 'doppelkey handle vectors v1', spec: 'docs/protocol.md', vectors }, null, 2) + '\n');

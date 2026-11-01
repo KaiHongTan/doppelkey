@@ -1,6 +1,6 @@
 # doppelkey wire protocol v1 and handle format v1
 
-This is the contract between the shims (`shims/node`, later `shims/python`) and a keeper. Keepers are the Node test keeper in `compat/test-keeper` and, from Milestone 2, `doppelkeyd`. It refines sections 7 and 8 of `DOPPELKEY.md` using the findings in `docs/research.md`. Shared test vectors live in `crates/proto/vectors/`.
+The contract between the shims (`shims/*`) and a keeper: `doppelkeyd`, or the Node test keeper in `compat/test-keeper`. Shared test vectors live in `crates/proto/vectors/`; every shim and both keepers are tested against them.
 
 ## Handles
 
@@ -108,11 +108,3 @@ There is no op that returns key material, and keepers must not add one. Every re
 - The seed encodes the parent handle id(s), the op and every parameter.
 - Same parent + same parameters → same handle, so key IDs stay stable for the life of the keeper salt.
 - A derived key's allowed ops are `hmac`, `aes_gcm` and `aes_cbc`.
-
-## Changes from the proposal in `DOPPELKEY.md`
-
-- id is 12 hex characters, not 16, and there is a 20-byte compact form. Reason: SHA-1-derived keys.
-- New op `pbkdf2`. Reason: iron-session and other WebCrypto PBKDF2 users.
-- New optional fields `prefix`, `key_encoding` and `key_bits`.
-- New error code `crypto_error`.
-- `hash_derive` params are renamed to `prefix_data` and `suffix_data`, to avoid clashing with the key `prefix` field.

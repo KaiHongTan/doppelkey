@@ -19,7 +19,7 @@ NODE_OPTIONS="--require doppelkey/register" npm run dev
 | | `hkdf`, `hkdfSync`, `pbkdf2`, `pbkdf2Sync` | keeper returns a new handle |
 | | `createSecretKey`, `KeyObject.from`, `KeyObject#export` | decoy `KeyObject` of random bytes; `export()` gives back the handle |
 | | `scrypt`, `scryptSync` | refused (not supported yet) |
-| node:crypto | `createHash`, `crypto.hash` over a handle | a new handle; RFC 7638 JWK thumbprints of a handle are computed by the keeper (Auth.js `kid`) |
+| | `createHash`, `crypto.hash` over a handle | a new handle; RFC 7638 JWK thumbprints of a handle are computed by the keeper (Auth.js `kid`) |
 | WebCrypto | `importKey` (raw, jwk) | decoy `CryptoKey` of random bytes |
 | | `sign`, `verify` (HMAC) | keeper `hmac` |
 | | `encrypt`, `decrypt` (AES-GCM, AES-CBC) | keeper |

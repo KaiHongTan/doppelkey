@@ -1,4 +1,4 @@
-// Libraries the research found giving silently wrong results under the prototype shim.
+// Libraries that compute crypto in ways a naive shim misses (see docs/research.md).
 import { encode as nextAuthEncode, decode as nextAuthDecode } from 'next-auth/jwt';
 import { sealData, unsealData } from 'iron-session';
 import { Webhook } from 'svix';

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Test keeper: a Node implementation of wire protocol v1 (docs/protocol.md), ported from
-// prototype/keeper.mjs so shim work isn't blocked on doppelkeyd. TEST USE ONLY: it reads real
-// key bytes from a JSON vault file. doppelkeyd (Milestone 2) replaces it.
+// Test keeper: a Node implementation of wire protocol v1 (docs/protocol.md), so the shims can be
+// tested without building doppelkeyd. TEST USE ONLY: it reads key bytes from a plain JSON vault
+// of fake secrets.
 //
 //   node keeper.mjs --vault <vault.json> [--socket <path>] [--audit <audit.jsonl>]
 //

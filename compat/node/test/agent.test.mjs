@@ -1,6 +1,6 @@
-// Milestone 4 acceptance, automated: after `doppelkey init`, an agent running as the same user
-// can run the app, but none of the things a curious or prompt-injected agent would try reveal a
-// real secret. (The memory checks need a non-root user: root bypasses PR_SET_DUMPABLE.)
+// After `doppelkey init`, an agent running as the same user can run the app, but nothing a
+// curious or prompt-injected agent would try reveals a real secret. (The memory checks need a
+// non-root user: root bypasses PR_SET_DUMPABLE.)
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

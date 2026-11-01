@@ -30,7 +30,7 @@ def unsupported(what):
     raise DoppelkeyError(
         "unsupported",
         "%s is not supported with a doppelkey handle yet, so the call was refused instead of computing with the handle text" % what,
-        "See docs/research.md or open an issue.",
+        "If you need it, open an issue: https://github.com/KaiHongTan/dopplekey/issues",
     )
 
 

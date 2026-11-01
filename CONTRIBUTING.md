@@ -1,10 +1,10 @@
 # Contributing to doppelkey
 
-Thanks for helping. Bug reports, compatibility results for libraries we haven't tested, and pull requests are all welcome.
+Thanks for helping. Bug reports, compatibility results for untested libraries, and pull requests are all welcome. Start with [docs/design.md](docs/design.md) for how the pieces fit together.
 
 ## Ground rules
 
-These come from the design brief (`DOPPELKEY.md`, section 0) and apply to every change:
+These apply to every change:
 
 1. **Never handle real secrets.** Tests use fake secrets only (`compat/fixtures/vault.json`). Never print, log, commit or paste a real key.
 2. **Shims stay dependency-free.** `shims/*` load into every process, so they must be small and auditable.
@@ -43,6 +43,6 @@ Changes to `docs/protocol.md` must land in the Rust keeper (`crates/doppelkeyd/s
 
 ## Commit and PR style
 
-Small, focused PRs with a description of *why*. Note any change to the threat model or to what leaves the keeper.
+Keep pull requests small and focused, and explain *why* in the description. Call out any change to the threat model or to what leaves the keeper.
 
 By contributing you agree that your contributions are licensed under the Apache License 2.0, and you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).

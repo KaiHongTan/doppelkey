@@ -1,4 +1,4 @@
-// Milestone 3: Auth.js tokens made with a handle decrypt on a server holding the real secret.
+// Auth.js tokens made with a handle decrypt on a server holding the real secret.
 // That needs the token's `kid` (a JWK thumbprint of the derived key) to match the real one.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
