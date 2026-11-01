@@ -1,4 +1,4 @@
-pyjwt>=2.8
+pyjwt>=2.15.1
 itsdangerous>=2.1
 django>=4.2
 flask>=3.0
