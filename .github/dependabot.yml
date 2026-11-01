@@ -6,6 +6,10 @@ updates:
   - package-ecosystem: npm
     directory: /shims/node
     schedule: { interval: weekly }
+    ignore:
+      # Types track the oldest supported Node (engines: >=22), so the shim can't use newer APIs by accident.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /compat/node
     schedule: { interval: weekly }
@@ -14,6 +18,11 @@ updates:
   - package-ecosystem: pip
     directory: /compat/python
     schedule: { interval: weekly }
+    # requirements.txt holds minimum versions; CI already installs the newest release.
+    # Only raise a floor when the newest release falls outside it.
+    versioning-strategy: increase-if-necessary
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }

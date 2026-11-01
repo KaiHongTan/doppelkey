@@ -1,5 +1,5 @@
-# Homebrew formula template for a tap (e.g. KaiHongTan/homebrew-tap). The release workflow's
-# SHA256SUMS provides the checksums; update `version` and `sha256` per release.
+# Homebrew formula template for a tap (KaiHongTan/homebrew-tap). Take the checksums from the
+# release's SHA256SUMS; packaging/set-version.sh updates `version`. See docs/releasing.md.
 class Doppelkey < Formula
   desc "ssh-agent for app secrets: keep signing and encryption keys out of your app"
   homepage "https://github.com/KaiHongTan/doppelkey"

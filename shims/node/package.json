@@ -1,6 +1,6 @@
 {
   "name": "doppelkey",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "ssh-agent for app secrets: keep signing and encryption keys out of your app's memory (Node shim)",
   "license": "Apache-2.0",
   "type": "commonjs",
