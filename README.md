@@ -195,8 +195,8 @@ To run the suites against the Rust keeper instead of the Node test keeper, set `
 | `shims/` | Node, Python, Ruby and Java shims, with no runtime dependencies |
 | `compat/` | Compatibility suites, test keeper, fake fixtures |
 | `integrations/` | Claude Code plugin, Agent Skills `SKILL.md`, Codex guide |
-| `docs/` | Design, protocol, comparison, compatibility, research, demo |
-| `packaging/` | Release helpers: npm platform packages, macOS signing, Homebrew |
+| `docs/` | Design, protocol, comparison, compatibility, research, releasing, demo |
+| `packaging/` | Release helpers: version scripts, npm platform packages, macOS signing, Homebrew ([releasing](docs/releasing.md)) |
 
 </details>
 

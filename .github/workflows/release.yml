@@ -1,5 +1,8 @@
 # Release on a version tag (v0.1.0): build the CLI + keeper for each platform, bundle the shims,
-# publish a GitHub release with checksums, then npm (launcher + per-platform binaries) and PyPI.
+# publish a GitHub release with checksums, then npm (launcher + per-platform binaries), PyPI and
+# RubyGems. Set the version first with packaging/set-version.sh; the tag must match it.
+# Tags with a pre-release suffix (v0.2.0-rc.1) publish to npm under the `next` dist-tag.
+# Each publish step skips a version that is already on the registry, so a failed run can be re-run.
 #
 # Hand-written instead of cargo-dist because each archive must also carry the Node and Python
 # shims (share/doppelkey/...), which the CLI references when it writes auto-load lines.
@@ -14,9 +17,20 @@ permissions:
   id-token: write # npm provenance and PyPI trusted publishing
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the package versions
+        run: sh packaging/check-version.sh "${GITHUB_REF_NAME#v}"
+
   build:
+    needs: check
     name: build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    env:
+      # Secrets can't be tested in `if:` directly, and a step's own env isn't visible to its `if:`.
+      HAS_APPLE_SIGNING: ${{ secrets.APPLE_CERT_P12 != '' }}
     strategy:
       matrix:
         include:
@@ -44,7 +58,7 @@ jobs:
       - name: Build binaries
         run: cargo build --release --locked --target ${{ matrix.target }} ${{ contains(matrix.target, 'apple') && '--features macos-keychain' || '' }}
       - name: Sign and notarize (macOS, when signing secrets are configured)
-        if: contains(matrix.target, 'apple') && env.APPLE_CERT_P12 != ''
+        if: contains(matrix.target, 'apple') && env.HAS_APPLE_SIGNING == 'true'
         env:
           APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
           APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
@@ -104,20 +118,30 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: Use an npm that supports trusted publishing (11.5.1+)
+        run: npm install -g npm@11
       - name: Publish per-platform binary packages, then the launcher + shim
         env:
+          # Optional: with trusted publishing configured on npmjs.com, npm authenticates with
+          # GitHub's OIDC token and this secret isn't needed.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          case "$VERSION" in *-*) TAG=next ;; *) TAG=latest ;; esac
+          publish() { # publish <dir> <name>, skipping a version that is already on the registry
+            if npm view "$2@$VERSION" version >/dev/null 2>&1; then echo "$2@$VERSION already published"; return; fi
+            (cd "$1" && npm publish --provenance --access public --tag "$TAG")
+          }
           node packaging/npm/make-platform-packages.mjs "$VERSION" dist out
-          for d in out/*/; do (cd "$d" && npm publish --provenance --access public); done
-          cd shims/node && npm ci && npm run build && npm version --no-git-tag-version "$VERSION"
+          for p in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do publish "out/cli-$p" "@doppelkey/cli-$p"; done
+          cd shims/node && npm ci && npm run build
           # The per-platform binaries are added as optional dependencies only at publish time
           # (they don't exist on the registry before the first release, which would break npm ci).
           for p in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do npm pkg set "optionalDependencies.@doppelkey/cli-$p=$VERSION"; done
-          npm publish --provenance --access public
+          publish . doppelkey
 
   pypi:
+    needs: build
     runs-on: ubuntu-latest
     environment: pypi
     steps:
@@ -127,3 +151,23 @@ jobs:
           python-version: "3.13"
       - run: pip install build && python -m build shims/python --outdir dist
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+
+  rubygems:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: rubygems
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+      - uses: rubygems/configure-rubygems-credentials@v1.0.0
+      - name: Build and push the gem
+        working-directory: shims/ruby
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if gem list --remote --exact --all doppelkey | grep -q "[( ]$VERSION[,)]"; then echo "doppelkey $VERSION already on RubyGems"; exit 0; fi
+          gem build doppelkey.gemspec
+          gem push doppelkey-*.gem
