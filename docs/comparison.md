@@ -33,7 +33,7 @@ Use doppelkey **together with** a placeholder proxy. The proxy covers outbound A
 | paste the key into chat, a commit or a log | leaked for good | a handle leaks; nothing to rotate |
 | read the keeper's memory | n/a | blocked (non-dumpable on Linux; signed hardened runtime on macOS) |
 | read the vault file | n/a | encrypted; needs your passphrase |
-| run `doppelkey eject` or loosen a policy | n/a | needs a human to confirm |
+| run `doppelkey eject` or loosen a policy | n/a | needs your vault passphrase (or the keeper's dialog with the macOS Keychain); a pseudo-terminal doesn't count |
 | ask the keeper to export a key | n/a | no such operation |
 | ask the keeper to sign while it runs | n/a | works within policy, and is logged |
 | replace the keeper's binary or service file | n/a | possible if they're user-writable; install read-only |

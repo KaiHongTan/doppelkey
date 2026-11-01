@@ -1,5 +1,6 @@
 //! doppelkey keeper (`doppelkeyd`) and CLI (`doppelkey`). See docs/design.md and docs/protocol.md.
 
+pub mod admin;
 pub mod audit;
 pub mod cli;
 pub mod confirm;

@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Security
+
+Fixes from an independent review:
+
+- The CLI no longer decrypts the vault. Vault creation, key import, policy changes and eject are now keeper operations, and the keeper alone decides whether a human approved. Before this, eject's confirmation was a branch in the CLI, which any program could satisfy by running it under a pseudo-terminal; with the macOS Keychain, that meant no approval at all.
+- A human now approves eject and policy loosening with the vault passphrase, which the keeper checks, so it works without a display. On Keychain vaults, the keeper's own dialog approves.
+- After approval, the keeper writes the restored values itself, so no key material crosses the socket.
+- `DOPPELKEY_ASKPASS` no longer approves eject or policy loosening (except on key-file vaults). Prompt programs run by absolute path, so a fake `osascript` on `PATH` can't answer.
+- The macOS Keychain item is now created by `doppelkeyd`, so the CLI isn't on its access list.
+- Docs: doppelkey resists exfiltration, not use (stated on the first screen); headless limits, `DOPPELKEY_PASSPHRASE` and unverified macOS memory protection are documented; the prior-art claim is narrowed.
+
 ### Added
 
 - `doppelkeyd`, the keeper (Rust):

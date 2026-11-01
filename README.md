@@ -5,7 +5,7 @@
 **An ssh-agent for app secrets.**
 
 Keep your app's signing and encryption keys out of its memory,<br>
-and out of reach of the AI coding agents and tools that run as you.
+so the AI coding agents and tools that run as you can use them, but never take them.
 
 [![CI](https://github.com/KaiHongTan/doppelkey/actions/workflows/ci.yml/badge.svg)](https://github.com/KaiHongTan/doppelkey/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
@@ -27,6 +27,8 @@ JWT_SECRET=dk1:NOT-A-SECRET-load-doppelkey-shim:a1b2c3d4e5f6:d3ae
 
 Your app doesn't change. `npm run dev`, `pytest` and `rails s` run as before, and every signature and ciphertext is identical to what the real key produces.
 
+Like ssh-agent, doppelkey stops **theft**, not **use**: while the keeper runs, anything running as you can still ask it to sign, within each key's policy and with every use logged. What nothing can do is copy the key, so when the keeper stops, so does the access.
+
 > [!NOTE]
 > **Alpha (v0.1).** Everything below is implemented and tested, but doppelkey hasn't had an independent security review yet. Start with development keys.
 
@@ -37,6 +39,8 @@ Coding agents run your dev server and tests, so they can read every key your app
 Tools that keep *API keys* away from agents swap them in at the network edge. That doesn't work for keys your code **computes with**, such as JWT and session secrets, webhook secrets, encryption keys and AWS secret keys. Your app needs the real bytes to produce a correct signature.
 
 doppelkey takes the ssh-agent approach instead: the key stays in a separate process, and your app only ever asks for results.
+
+Think of it as a third layer: use separate development keys first, a network proxy for outbound API keys second, and doppelkey for the keys your code signs and encrypts with.
 
 ## Highlights
 
@@ -69,7 +73,7 @@ It shows every change before making it, and `doppelkey eject` puts everything ba
 ```bash
 doppelkey doctor     # check the setup; prints the fix for each problem
 doppelkey log        # which program used which key, and when
-doppelkey eject      # restore the real values (asks you to confirm)
+doppelkey eject      # restore the real values (asks for your vault passphrase)
 ```
 
 ## How it works
@@ -127,8 +131,8 @@ It doesn't stop **misuse** while the keeper runs: like ssh-agent, any process th
 | | |
 | --- | --- |
 | 🔐 **Keys at rest** | An encrypted vault, unlocked by your passphrase or the macOS Keychain |
-| 🧠 **Keeper memory** | Non-dumpable on Linux; a signed hardened-runtime build on macOS |
-| 🙋 **Human gates** | `eject` and loosening a policy need a person to confirm; the program asking can't approve itself |
+| 🧠 **Keeper memory** | Non-dumpable on Linux (tested in CI); on macOS, a signed hardened-runtime build (not yet verified on a real Mac) |
+| 🙋 **Human gates** | `eject` and loosening a policy need your vault passphrase, which the keeper checks itself (or, with the macOS Keychain, the keeper's own dialog). A program can't approve itself, even with a terminal |
 | 🚫 **Out of scope** | Root, and an attacker who can replace the keeper's binary or service file |
 
 Details: [SECURITY.md](SECURITY.md) · [comparison with other tools](docs/comparison.md) · [background research](docs/research.md)

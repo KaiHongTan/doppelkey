@@ -6,7 +6,7 @@ Facts for agents working in a repo that uses doppelkey:
 
 - Values starting with `dk1:`, `646b313a` or `ZGsxO` (sometimes after a prefix like `whsec_`) are doppelkey handles, not broken secrets. Never replace them or ask for real values.
 - To add a secret, the user runs `doppelkey set NAME`. To diagnose failures, run `doppelkey doctor`. Errors starting with `doppelkey:` name the next command to run.
-- Setup: `npx doppelkey init` (shows a preview first). Undo: `doppelkey eject` (needs a human to confirm).
+- Setup: `npx doppelkey init` (shows a preview first). Undo: `doppelkey eject` (needs the human's vault passphrase).
 - doppelkey does not cover network credentials (API keys, database URLs); pair it with a placeholder proxy for those.
 
 ## Docs

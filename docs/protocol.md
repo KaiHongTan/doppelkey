@@ -79,10 +79,29 @@ Common optional request fields for any op with a `handle`:
 | `pbkdf2` | `hash`, `salt`, `iterations`, `length` | `handle` (split-half rule for 64 bytes) |
 | `aes_gcm` | `mode` (`encrypt`/`decrypt`), `iv` (12 bytes), `data`, `aad?`, `key_bits?` | `out`. Ciphertext ends with the 16-byte tag; decrypt input must include it |
 | `aes_cbc` | `mode`, `iv` (16 bytes), `data`, `padding?` (default `true`, PKCS#7), `key_bits?` | `out` |
-| `status` | none | `version`, `keys` (names only), `protocol` |
+| `status` | none | `version`, `keys` (names only), `protocol`, `locked`, `vault` (`passphrase`, `keychain`, `file`, `test` or null) |
 
 - `key_bits`, when present, must equal the real key's length in bits. Otherwise the request fails with `bad_request`. This catches an app using `aes-128-gcm` with a 32-byte key.
 - v1 restricts AES-GCM to 12-byte IVs and 16-byte tags, so every keeper can implement it with a fixed RustCrypto type.
+
+### Admin ops
+
+Used by the `doppelkey` CLI, which never decrypts the vault itself. None of them returns key material.
+
+| op | params | result |
+| --- | --- | --- |
+| `unlock` | `passphrase` | unlocks a passphrase vault |
+| `lock` | none | wipes keys from memory |
+| `reload` | none | re-reads the vault file |
+| `vault_create` | `protect` (`passphrase`, `keychain`, `file`), `passphrase?` | creates and unlocks a new vault |
+| `import` | `name`, `value_b64`, `form`, `prefix`, `policy`, `project`, `file`, `original` | `id`, `written` (the handle text to put in the file). The same value in the same project reuses its id |
+| `backup_put` | `path`, `content_b64` | keeps the first backup of a project file `init` changes |
+| `policies` | `name?`, `ids?` | `keys`: `id`, `name`, `policy` |
+| `set_policy` | `ids`, `edit`, `passphrase?` | `keys`. An edit that loosens a policy needs a human (below) |
+| `eject` | `ids`, `targets?` (`id`, `file`), `paths`, `project`, `passphrase?` | needs a human. The keeper writes the original values back into the files (the recorded file, or a target inside the key's project) and returns `restored` (ids and names), `problems` and the requested file `backups` |
+| `forget` | `ids`, `paths` | removes keys (only ones just ejected) and backups |
+
+**Human approval** is decided by the keeper. Passphrase vault: `passphrase` must open the vault, and nothing else counts. Keychain vault: the keeper's own `/usr/bin/osascript` dialog. Key-file vault: any keeper prompt, including `DOPPELKEY_ASKPASS`. A refusal is `confirm_denied`.
 
 ### Error codes
 
@@ -91,16 +110,17 @@ Common optional request fields for any op with a `handle`:
 | `unknown_handle` | no such key, or a bad crc | `doppelkey doctor` |
 | `op_not_allowed` | policy refuses this op, service or prefix for this key | `doppelkey policy <NAME> --allow <op>` |
 | `rate_limited` | per-key rate limit hit | `doppelkey policy <NAME>` |
-| `confirm_denied` | the human refused a confirm prompt | none |
+| `confirm_denied` | the human refused a prompt, or approval (passphrase or dialog) is missing or wrong | none |
 | `bad_request` | malformed request, unsupported algorithm, wrong key size, or derived key too short | the fix |
 | `crypto_error` | e.g. AES-GCM authentication failed | none |
 | `version_mismatch` | `v` is not 1 | `doppelkey doctor` |
+| `locked` | the keeper's vault is locked | `doppelkey unlock` |
 
 Shims add `keeper_unreachable`, `keeper_timeout` and `unsupported` (an algorithm the shim refuses to run with a handle) locally. Every message a shim throws names the next command to run.
 
 ### No export
 
-There is no op that returns key material, and keepers must not add one. Every result is one of: a MAC, a ciphertext or plaintext, a new handle, or names. The test suite checks that no response to any op (including unknown ops) contains a real key in raw, hex, base64 or base64url form.
+There is no op that returns key material, and keepers must not add one. Every result is one of: a MAC, a ciphertext or plaintext, a new handle, or names. Even an approved `eject` returns none: the keeper writes the values to disk itself. The test suite checks that no response to any op (including unknown ops) contains a real key in raw, hex, base64 or base64url form.
 
 ## Derived handles
 
