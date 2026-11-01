@@ -1,0 +1,32 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste real secrets.** Handles (`dk1:…`) are fine to share. Security vulnerabilities: report privately (see SECURITY.md), not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got. Include the full `doppelkey:` error message.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `doppelkey doctor`
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "`doppelkey --version`, OS, and runtime (e.g. Node 24.2, Python 3.13)"
+    validations:
+      required: true
+  - type: input
+    id: library
+    attributes:
+      label: Library involved (if any)
+      description: e.g. jsonwebtoken 9.0.2, Django 6.1

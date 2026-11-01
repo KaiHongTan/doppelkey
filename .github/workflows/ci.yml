@@ -1,0 +1,139 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Build the shim
+        working-directory: shims/node
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+      - name: Check the shim has no runtime dependencies
+        working-directory: shims/node
+        run: node -e "const p=require('./package.json'); if (p.dependencies && Object.keys(p.dependencies).length) { console.error('shims/node must have zero runtime dependencies'); process.exit(1) }"
+      - name: Compatibility suite (oracle pattern)
+        working-directory: compat/node
+        run: |
+          npm ci
+          node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs
+
+  bun:
+    name: bun (apps) / ubuntu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+      - name: Build the shim
+        working-directory: shims/node
+        run: npm ci && npm run build
+      - name: Compatibility suite with apps running under Bun
+        working-directory: compat/node
+        run: |
+          npm ci
+          DOPPELKEY_TEST_RUNTIME="$(which bun)" node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs
+
+  rust:
+    name: doppelkeyd / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --all
+      - run: cargo build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build the shim
+        working-directory: shims/node
+        run: npm ci && npm run build
+      - name: Compatibility suite against doppelkeyd (runs as a non-root user, so the memory test applies)
+        working-directory: compat/node
+        run: |
+          npm ci
+          DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" node --test --test-reporter=spec --test-concurrency=1 test/*.test.mjs
+
+  python:
+    name: python ${{ matrix.python }} / ubuntu
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build
+      - name: Python compatibility suite (Node test keeper, then doppelkeyd)
+        working-directory: compat/python
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt
+          .venv/bin/python -m unittest -v test_compat
+          DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" .venv/bin/python -m unittest -v test_compat
+
+  ruby:
+    name: ruby ${{ matrix.ruby }} / ubuntu
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.2", "3.3", "3.4"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build
+      - name: Ruby compatibility suite (Node test keeper, then doppelkeyd)
+        working-directory: compat/ruby
+        run: |
+          gem install --install-dir .gems activesupport jwt --no-document
+          ruby test_compat.rb
+          DOPPELKEY_KEEPER_CMD="$GITHUB_WORKSPACE/target/debug/doppelkeyd insecure-test-keeper" ruby test_compat.rb

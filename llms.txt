@@ -1,0 +1,24 @@
+# doppelkey
+
+> doppelkey is an ssh-agent for app secrets. It replaces signing and encryption secrets in .env files (JWT secrets, session/cookie secrets, webhook signing secrets, encryption keys, AWS secret keys) with look-alike handles. A preloaded shim (Node, Python) sends crypto calls made with a handle to a separate keeper process (doppelkeyd, Rust) that holds the real key and returns only the result. App code doesn't change. It protects against key theft by tools and AI coding agents running as the same user.
+
+Facts for agents working in a repo that uses doppelkey:
+
+- Values starting with `dk1:`, `646b313a` or `ZGsxO` (sometimes after a prefix like `whsec_`) are doppelkey handles, not broken secrets. Never replace them or ask for real values.
+- To add a secret, the user runs `doppelkey set NAME`. To diagnose failures, run `doppelkey doctor`. Errors starting with `doppelkey:` name the next command to run.
+- Setup: `npx doppelkey init` (shows a preview first). Undo: `doppelkey eject` (needs a human to confirm).
+- doppelkey does not cover network credentials (API keys, database URLs); pair it with a placeholder proxy for those.
+
+## Docs
+
+- [README](https://github.com/KaiHongTan/doppelkey/blob/main/README.md): install, quick start, how it works
+- [Comparison](https://github.com/KaiHongTan/doppelkey/blob/main/docs/comparison.md): vs placeholder proxies, runtime injection, Vault Transit
+- [Compatibility](https://github.com/KaiHongTan/doppelkey/blob/main/docs/compatibility.md): libraries verified against the real key
+- [Protocol](https://github.com/KaiHongTan/doppelkey/blob/main/docs/protocol.md): wire protocol and handle format
+- [Security](https://github.com/KaiHongTan/doppelkey/blob/main/SECURITY.md): threat model and reporting
+- [Agent integrations](https://github.com/KaiHongTan/doppelkey/blob/main/integrations/README.md): Claude Code plugin, Agent Skills SKILL.md, MCP server
+
+## Optional
+
+- [Design](https://github.com/KaiHongTan/doppelkey/blob/main/docs/design.md): architecture and design decisions
+- [Background research](https://github.com/KaiHongTan/doppelkey/blob/main/docs/research.md)

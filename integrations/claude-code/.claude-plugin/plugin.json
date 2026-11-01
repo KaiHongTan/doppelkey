@@ -1,0 +1,11 @@
+{
+  "name": "doppelkey",
+  "displayName": "doppelkey",
+  "version": "0.1.0",
+  "description": "Keep your app's signing and encryption keys out of reach: doppelkey swaps .env secrets for handles and performs crypto in a separate keeper. Adds a setup skill, a session hook that loads the shims, and an MCP server (status, doctor, list_secrets).",
+  "author": { "name": "doppelkey contributors" },
+  "homepage": "https://github.com/KaiHongTan/doppelkey",
+  "repository": "https://github.com/KaiHongTan/doppelkey",
+  "license": "Apache-2.0",
+  "keywords": ["secrets", "security", "env", "jwt", "webhooks", "encryption"]
+}

@@ -1,0 +1,49 @@
+[package]
+name = "doppelkeyd"
+description = "doppelkey keeper daemon and CLI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "doppelkey"
+path = "src/main.rs"
+
+[[bin]]
+name = "doppelkeyd"
+path = "src/bin/doppelkeyd.rs"
+
+[lib]
+name = "doppelkeyd"
+path = "src/lib.rs"
+
+[dependencies]
+aes = "0.9.3"
+aes-gcm = "0.11.1"
+argon2 = "0.6.0"
+base64 = "0.23.1"
+cbc = { version = "0.2.1", features = ["alloc"] }
+chacha20poly1305 = "0.11.0"
+clap = { version = "4.6.7", features = ["derive"] }
+doppelkey-proto = { path = "../proto" }
+hkdf = "0.13.0"
+hmac = "0.13.0"
+libc = "0.2.191"
+pbkdf2 = "0.13.0"
+rand = "0.10.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha1 = "0.11.0"
+sha2 = "0.11.1"
+tokio = { version = "1.54.1", features = ["rt", "rt-multi-thread", "net", "io-util", "macros", "sync", "time", "signal"] }
+toml = "1.1.8"
+zeroize = "1.9.1"
+
+[features]
+default = []
+# Store the vault key in the macOS Keychain (ACL bound to the signed binary).
+macos-keychain = ["dep:keyring"]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"], optional = true }

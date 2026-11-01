@@ -1,0 +1,129 @@
+# Release on a version tag (v0.1.0): build the CLI + keeper for each platform, bundle the shims,
+# publish a GitHub release with checksums, then npm (launcher + per-platform binaries) and PyPI.
+#
+# Hand-written instead of cargo-dist because each archive must also carry the Node and Python
+# shims (share/doppelkey/...), which the CLI references when it writes auto-load lines.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write # npm provenance and PyPI trusted publishing
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, npm: linux-x64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, npm: linux-arm64 }
+          - { os: macos-latest, target: aarch64-apple-darwin, npm: darwin-arm64 }
+          - { os: macos-latest, target: x86_64-apple-darwin, npm: darwin-x64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build the Node shim
+        working-directory: shims/node
+        run: npm ci && npm run build
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Build the Java agent
+        run: sh shims/java/build.sh
+      - name: Build binaries
+        run: cargo build --release --locked --target ${{ matrix.target }} ${{ contains(matrix.target, 'apple') && '--features macos-keychain' || '' }}
+      - name: Sign and notarize (macOS, when signing secrets are configured)
+        if: contains(matrix.target, 'apple') && env.APPLE_CERT_P12 != ''
+        env:
+          APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER }}
+        run: packaging/macos-sign.sh target/${{ matrix.target }}/release
+      - name: Package
+        id: pkg
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NAME="doppelkey-${VERSION}-${{ matrix.target }}"
+          mkdir -p "$NAME/bin" "$NAME/share/doppelkey/node" "$NAME/share/doppelkey/python"
+          cp target/${{ matrix.target }}/release/doppelkey target/${{ matrix.target }}/release/doppelkeyd "$NAME/bin/"
+          cp shims/node/dist/register.cjs shims/node/dist/register.mjs "$NAME/share/doppelkey/node/"
+          cp -R shims/python/src/doppelkey shims/python/src/sitecustomize.py "$NAME/share/doppelkey/python/"
+          mkdir -p "$NAME/share/doppelkey/ruby" && cp -R shims/ruby/lib/. "$NAME/share/doppelkey/ruby/"
+          mkdir -p "$NAME/share/doppelkey/java" && cp shims/java/dist/doppelkey-agent.jar "$NAME/share/doppelkey/java/"
+          cp LICENSE README.md "$NAME/"
+          tar czf "$NAME.tar.gz" "$NAME"
+          shasum -a 256 "$NAME.tar.gz" > "$NAME.tar.gz.sha256"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.npm }}
+          path: |
+            ${{ steps.pkg.outputs.name }}.tar.gz
+            ${{ steps.pkg.outputs.name }}.tar.gz.sha256
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat dist/*.sha256 > dist/SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS install.sh --title "$GITHUB_REF_NAME" --generate-notes
+
+  npm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish per-platform binary packages, then the launcher + shim
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node packaging/npm/make-platform-packages.mjs "$VERSION" dist out
+          for d in out/*/; do (cd "$d" && npm publish --provenance --access public); done
+          cd shims/node && npm ci && npm run build && npm version --no-git-tag-version "$VERSION"
+          # The per-platform binaries are added as optional dependencies only at publish time
+          # (they don't exist on the registry before the first release, which would break npm ci).
+          for p in linux-x64 linux-arm64 darwin-x64 darwin-arm64; do npm pkg set "optionalDependencies.@doppelkey/cli-$p=$VERSION"; done
+          npm publish --provenance --access public
+
+  pypi:
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install build && python -m build shims/python --outdir dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

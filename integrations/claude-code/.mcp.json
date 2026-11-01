@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "doppelkey": {
+      "command": "doppelkey",
+      "args": ["mcp"]
+    }
+  }
+}

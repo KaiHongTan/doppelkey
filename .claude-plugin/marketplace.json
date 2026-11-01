@@ -1,0 +1,12 @@
+{
+  "name": "doppelkey",
+  "owner": { "name": "doppelkey contributors" },
+  "description": "doppelkey plugins for Claude Code",
+  "plugins": [
+    {
+      "name": "doppelkey",
+      "source": "./integrations/claude-code",
+      "description": "Keep app signing and encryption keys out of reach of tools and agents: setup skill, session hook, MCP server."
+    }
+  ]
+}

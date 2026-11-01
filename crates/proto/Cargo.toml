@@ -1,0 +1,13 @@
+[package]
+name = "doppelkey-proto"
+description = "doppelkey wire protocol v1 and handle format"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64 = "0.23.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
