@@ -57,5 +57,5 @@ export function aesCbc(ref: KeyRef, a: AesArgs): Buffer {
 
 /** Thrown when an app uses a handle with an algorithm the keeper can't perform. Fail closed. */
 export function unsupported(what: string): never {
-  throw new DoppelkeyError('unsupported', `${what} is not supported with a doppelkey handle yet, so the call was refused instead of computing with the handle text`, 'If you need it, open an issue: https://github.com/KaiHongTan/dopplekey/issues');
+  throw new DoppelkeyError('unsupported', `${what} is not supported with a doppelkey handle yet, so the call was refused instead of computing with the handle text`, 'If you need it, open an issue: https://github.com/KaiHongTan/doppelkey/issues');
 }

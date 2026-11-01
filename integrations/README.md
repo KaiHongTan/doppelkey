@@ -11,11 +11,11 @@ All of them need the `doppelkey` CLI on `PATH`.
 ## Claude Code
 
 ```bash
-claude plugin marketplace add KaiHongTan/dopplekey
+claude plugin marketplace add KaiHongTan/doppelkey
 claude plugin install doppelkey@doppelkey
 ```
 
-Inside a session, the equivalent is `/plugin marketplace add KaiHongTan/dopplekey`, then `/plugin install doppelkey@doppelkey`.
+Inside a session, the equivalent is `/plugin marketplace add KaiHongTan/doppelkey`, then `/plugin install doppelkey@doppelkey`.
 
 The plugin adds three things:
 

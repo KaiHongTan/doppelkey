@@ -11,4 +11,4 @@ Pure Python, zero dependencies. Installing the package drops `doppelkey.pth` int
 
 Covers PyJWT, itsdangerous (Flask sessions), Django signing, boto3 SigV4 (and SigV2 presigning if the key's policy allows it), and AES-GCM field encryption. `doppelkey init` writes the `.pth` into your project's venv for you; `doppelkey run -- python app.py` loads it for one command.
 
-Part of [doppelkey](https://github.com/KaiHongTan/dopplekey), an ssh-agent for app secrets.
+Part of [doppelkey](https://github.com/KaiHongTan/doppelkey), an ssh-agent for app secrets.

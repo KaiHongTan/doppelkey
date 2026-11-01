@@ -4,7 +4,7 @@ doppelkey is security software, so security reports are especially welcome.
 
 ## Reporting a vulnerability
 
-Please **do not open a public issue**. Report privately through GitHub: [Security → Report a vulnerability](https://github.com/KaiHongTan/dopplekey/security/advisories/new). Include what you found, how to reproduce it, and the impact you expect. We'll acknowledge reports within a few days, keep you informed, and credit you in the fix (unless you prefer otherwise).
+Please **do not open a public issue**. Report privately through GitHub: [Security → Report a vulnerability](https://github.com/KaiHongTan/doppelkey/security/advisories/new). Include what you found, how to reproduce it, and the impact you expect. We'll acknowledge reports within a few days, keep you informed, and credit you in the fix (unless you prefer otherwise).
 
 Never include real secrets in a report. Use fake keys like those in `compat/fixtures/vault.json`.
 

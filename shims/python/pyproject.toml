@@ -18,7 +18,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/KaiHongTan/dopplekey"
+Homepage = "https://github.com/KaiHongTan/doppelkey"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/doppelkey"]

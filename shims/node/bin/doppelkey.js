@@ -24,7 +24,7 @@ function find() {
 
 const bin = find();
 if (!bin) {
-  console.error(`doppelkey: no native binary for ${process.platform}-${process.arch}. Install it with:\n  curl -fsSL https://raw.githubusercontent.com/KaiHongTan/dopplekey/main/install.sh | sh\nor set DOPPELKEY_BIN to its path.`);
+  console.error(`doppelkey: no native binary for ${process.platform}-${process.arch}. Install it with:\n  curl -fsSL https://raw.githubusercontent.com/KaiHongTan/doppelkey/main/install.sh | sh\nor set DOPPELKEY_BIN to its path.`);
   process.exit(1);
 }
 // Tell the CLI which Node shim to reference when it writes auto-load lines.

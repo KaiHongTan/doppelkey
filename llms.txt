@@ -11,14 +11,14 @@ Facts for agents working in a repo that uses doppelkey:
 
 ## Docs
 
-- [README](https://github.com/KaiHongTan/dopplekey/blob/main/README.md): install, quick start, how it works
-- [Comparison](https://github.com/KaiHongTan/dopplekey/blob/main/docs/comparison.md): vs placeholder proxies, runtime injection, Vault Transit
-- [Compatibility](https://github.com/KaiHongTan/dopplekey/blob/main/docs/compatibility.md): libraries verified against the real key
-- [Protocol](https://github.com/KaiHongTan/dopplekey/blob/main/docs/protocol.md): wire protocol and handle format
-- [Security](https://github.com/KaiHongTan/dopplekey/blob/main/SECURITY.md): threat model and reporting
-- [Agent integrations](https://github.com/KaiHongTan/dopplekey/blob/main/integrations/README.md): Claude Code plugin, Agent Skills SKILL.md, MCP server
+- [README](https://github.com/KaiHongTan/doppelkey/blob/main/README.md): install, quick start, how it works
+- [Comparison](https://github.com/KaiHongTan/doppelkey/blob/main/docs/comparison.md): vs placeholder proxies, runtime injection, Vault Transit
+- [Compatibility](https://github.com/KaiHongTan/doppelkey/blob/main/docs/compatibility.md): libraries verified against the real key
+- [Protocol](https://github.com/KaiHongTan/doppelkey/blob/main/docs/protocol.md): wire protocol and handle format
+- [Security](https://github.com/KaiHongTan/doppelkey/blob/main/SECURITY.md): threat model and reporting
+- [Agent integrations](https://github.com/KaiHongTan/doppelkey/blob/main/integrations/README.md): Claude Code plugin, Agent Skills SKILL.md, MCP server
 
 ## Optional
 
-- [Design](https://github.com/KaiHongTan/dopplekey/blob/main/docs/design.md): architecture and design decisions
-- [Background research](https://github.com/KaiHongTan/dopplekey/blob/main/docs/research.md)
+- [Design](https://github.com/KaiHongTan/doppelkey/blob/main/docs/design.md): architecture and design decisions
+- [Background research](https://github.com/KaiHongTan/doppelkey/blob/main/docs/research.md)

@@ -63,7 +63,7 @@ pub fn systemd_unit(bin: &str) -> String {
         .map(|(k, v)| format!("Environment=\"{k}={}\"\n", v.replace('"', "\\\"")))
         .collect();
     format!(
-        "[Unit]\nDescription=doppelkey keeper (holds app keys; never exports them)\nDocumentation=https://github.com/KaiHongTan/dopplekey\n\n[Service]\nType=simple\nExecStart={bin} serve\n{env}Restart=on-failure\nUMask=0077\nNoNewPrivileges=yes\nLockPersonality=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nPrivateTmp=yes\nUnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT\n\n[Install]\nWantedBy=default.target\n"
+        "[Unit]\nDescription=doppelkey keeper (holds app keys; never exports them)\nDocumentation=https://github.com/KaiHongTan/doppelkey\n\n[Service]\nType=simple\nExecStart={bin} serve\n{env}Restart=on-failure\nUMask=0077\nNoNewPrivileges=yes\nLockPersonality=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\nMemoryDenyWriteExecute=yes\nSystemCallArchitectures=native\nPrivateTmp=yes\nUnsetEnvironment=LD_PRELOAD LD_LIBRARY_PATH LD_AUDIT\n\n[Install]\nWantedBy=default.target\n"
     )
 }
 

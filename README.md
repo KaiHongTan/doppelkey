@@ -7,7 +7,7 @@
 Keep your app's signing and encryption keys out of its memory,<br>
 and out of reach of the AI coding agents and tools that run as you.
 
-[![CI](https://github.com/KaiHongTan/dopplekey/actions/workflows/ci.yml/badge.svg)](https://github.com/KaiHongTan/dopplekey/actions/workflows/ci.yml)
+[![CI](https://github.com/KaiHongTan/doppelkey/actions/workflows/ci.yml/badge.svg)](https://github.com/KaiHongTan/doppelkey/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 ![Status: alpha](https://img.shields.io/badge/status-alpha-orange)
 
@@ -52,7 +52,7 @@ doppelkey takes the ssh-agent approach instead: the key stays in a separate proc
 
 ```bash
 # Install on macOS or Linux (or run any command with `npx doppelkey`)
-curl -fsSL https://raw.githubusercontent.com/KaiHongTan/dopplekey/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/KaiHongTan/doppelkey/main/install.sh | sh
 
 cd my-app
 doppelkey init       # preview first, then protect; sets a vault passphrase the first time
@@ -137,7 +137,7 @@ Details: [SECURITY.md](SECURITY.md) · [comparison with other tools](docs/compar
 
 - **Claude Code:** the plugin suggests `doppelkey init` when it sees secrets in `.env`. It also loads the shims for the commands Claude runs, and adds the MCP server.
   ```bash
-  claude plugin marketplace add KaiHongTan/dopplekey
+  claude plugin marketplace add KaiHongTan/doppelkey
   claude plugin install doppelkey@doppelkey
   ```
 - **Codex, Cursor, Gemini CLI, Copilot:** the same skill in the open [Agent Skills](integrations/skills/doppelkey/SKILL.md) format, plus `doppelkey mcp`.

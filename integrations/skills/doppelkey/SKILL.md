@@ -2,7 +2,7 @@
 name: doppelkey
 description: Protect app signing and encryption secrets in .env files from being read by tools and agents, and work correctly in projects that already use doppelkey. Use when a project has JWT, session, cookie, webhook, auth or encryption secrets in .env; when setting up auth, JWTs, sessions, webhooks or encryption; when .env values start with dk1:, 646b313a or ZGsxO; or when an error mentions doppelkey.
 license: Apache-2.0
-compatibility: Requires the doppelkey CLI (https://github.com/KaiHongTan/dopplekey). Node 22.15+ or Python 3.9+ apps.
+compatibility: Requires the doppelkey CLI (https://github.com/KaiHongTan/doppelkey). Node 22.15+ or Python 3.9+ apps.
 ---
 
 doppelkey is an ssh-agent for app secrets. It replaces signing and encryption secrets in `.env` with look-alike **handles** and performs crypto with the real keys in a separate keeper process. Apps run unchanged: a preloaded shim forwards crypto calls made with a handle.

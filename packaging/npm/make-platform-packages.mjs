@@ -23,7 +23,7 @@ for (const [target, [os, cpu]] of Object.entries(targets)) {
     version,
     description: `doppelkey CLI and keeper for ${os}-${cpu}`,
     license: 'Apache-2.0',
-    repository: { type: 'git', url: 'git+https://github.com/KaiHongTan/dopplekey.git' },
+    repository: { type: 'git', url: 'git+https://github.com/KaiHongTan/doppelkey.git' },
     os: [os],
     cpu: [cpu],
     files: ['bin', 'share', 'LICENSE', 'README.md'],

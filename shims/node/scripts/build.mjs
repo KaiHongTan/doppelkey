@@ -12,7 +12,7 @@ await build({
   target: 'node22',
   legalComments: 'none',
   define: { __VERSION__: JSON.stringify(pkg.version) },
-  banner: { js: `// doppelkey ${pkg.version} - https://github.com/KaiHongTan/dopplekey - zero runtime dependencies` },
+  banner: { js: `// doppelkey ${pkg.version} - https://github.com/KaiHongTan/doppelkey - zero runtime dependencies` },
 });
 fs.writeFileSync(new URL('../dist/register.mjs', import.meta.url),
   `// ESM entry for \`node --import doppelkey/register\`.\nimport { createRequire } from 'node:module';\ncreateRequire(import.meta.url)('./register.cjs');\n`);

@@ -24,7 +24,7 @@ if [ "$has_handles" = 1 ]; then
     fi
     echo "This project uses doppelkey. Values in .env that start with dk1:, 646b313a or ZGsxO (sometimes after whsec_) are handles, not broken secrets: never replace them or ask for real values. The real keys live in the doppelkey keeper; crypto made with a handle is done there. If a crypto call fails with a doppelkey error, run \"doppelkey doctor\". New secrets: ask the user to run \"doppelkey set NAME\"."
   else
-    echo "This project's .env contains doppelkey handles, but the doppelkey CLI is not installed here. Ask the user to install it (https://github.com/KaiHongTan/dopplekey) before running the app."
+    echo "This project's .env contains doppelkey handles, but the doppelkey CLI is not installed here. Ask the user to install it (https://github.com/KaiHongTan/doppelkey) before running the app."
   fi
 elif [ "$has_secrets" = 1 ]; then
   echo "This project keeps signing or encryption secrets in .env files, readable by any tool you run. The doppelkey skill can help the user protect them (they run \"npx doppelkey init\" and review a preview first)."

@@ -1,9 +1,9 @@
 #!/bin/sh
 # doppelkey installer: downloads the release for this OS/CPU, verifies its checksum, and
 # installs to ~/.local (bin/ and share/doppelkey/). Override with DOPPELKEY_PREFIX.
-#   curl -fsSL https://raw.githubusercontent.com/KaiHongTan/dopplekey/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/KaiHongTan/doppelkey/main/install.sh | sh
 set -eu
-REPO="KaiHongTan/dopplekey"
+REPO="KaiHongTan/doppelkey"
 PREFIX="${DOPPELKEY_PREFIX:-$HOME/.local}"
 VERSION="${DOPPELKEY_VERSION:-latest}"
 
