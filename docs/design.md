@@ -27,7 +27,7 @@ Tools that keep API keys away from agents work at the network edge: a proxy swap
 | Signing agents | ssh-agent, gpg-agent | Yes, for SSH and GPG keys only |
 | OS sandboxes | Anthropic `srt` | Partly: they can block reads of `.env`, but the app still loads the value |
 
-doppelkey is the in-process piece that sits next to the network-side proxies. As of late 2026, no other tool forwards HMAC, symmetric JWT or encryption operations from unmodified apps to a separate process. See [comparison.md](comparison.md) for more.
+doppelkey is the in-process piece that sits next to the network-side proxies. Moving crypto into a separate, hardened process is not new: PKCS#11 providers, HSM-backed JCA providers and Vault Transit have done it for decades, and doppelkey's Java shim is a JCA provider. What we didn't find, as of late 2026, is a tool that does this for development apps without code changes: driven by `.env`, across several runtimes, with format-preserving handles and derived keys that never leave the keeper. See [comparison.md](comparison.md) for more.
 
 ## Architecture
 
@@ -72,7 +72,7 @@ The format is specified in [protocol.md](protocol.md). In short:
 Notes:
 
 - **Synchronous calls.** `createHmac(...).digest()` must return immediately. The Node shim keeps the socket in a worker thread, blocks on `Atomics.wait` and reads the reply with `receiveMessageOnPort`. A keeper round trip costs about 250 µs, against 6 µs for a local HMAC.
-- **Always installed.** Frameworks such as Next.js load `.env` after preload, so the shim can't know in advance whether handles will appear. For ordinary keys its cost is one substring check per call, which is within measurement noise.
+- **Always installed.** Frameworks such as Next.js load `.env` after preload, so the shim can't know in advance whether handles will appear. For ordinary keys its cost is one substring check per call, which is within measurement noise (`compat/node/bench.mjs`). Calls with a handle cost a keeper round trip, about 40 times a local HMAC: fine for development, not for hot loops in production.
 - **Pure-JS crypto** (`@noble/hashes`, `fast-sha256`, `@oslojs/crypto`) never calls `node:crypto`. The Node shim wraps those packages at load time, with `module.registerHooks` on Node 22.15+ or a runtime plugin on Bun, and warns about any others it finds.
 - **Fail closed.** An unsupported algorithm used with a handle throws instead of computing with the handle text. Every error names the next command to run.
 
@@ -88,10 +88,11 @@ Notes:
 - **Keys in memory** are zeroized on drop and `mlock`ed.
 - **Hardening.** Memory protection depends on the platform:
   - **Linux:** `PR_SET_DUMPABLE=0`, which on its own blocks same-user reads of the keeper's memory and environment, even when Yama is off.
-  - **macOS:** `PT_DENY_ATTACH`, plus code signing with a hardened runtime.
+  - **macOS:** `PT_DENY_ATTACH`, plus code signing with a hardened runtime (not yet verified on a real Mac).
   - **Both:** no core dumps, and the keeper refuses to start with `LD_PRELOAD` or `DYLD_*` set.
 - **Policy** is stored inside the vault, so editing a file can't loosen it. Each key has allowed operations, optional AWS service limits, a rate limit, and optional confirm prompts.
-- **Human gates.** `eject` (writes real values back to disk) and loosening a policy need a human. The confirmation comes from a terminal, or from a prompt that the keeper shows using its own environment.
+- **The CLI never decrypts the vault.** Creating the vault, importing keys, storing file backups, changing policies and eject are keeper operations. The CLI is a program any agent can run, with any arguments, environment or terminal, so it can't be trusted to hold the vault or to decide that a human approved.
+- **Human gates.** `eject` (real values back on disk) and loosening a policy need a human, and the keeper decides. With a passphrase vault, approval is the passphrase, checked by the keeper; it works without a display, and nothing an agent can plant in a terminal or the keeper's environment stands in for it. With the macOS Keychain, approval is a dialog the keeper runs from `/usr/bin/osascript`. After approval the keeper writes the values back into the files they came from itself, so key material never crosses the socket.
 - **Service.** The keeper runs as a systemd or launchd user service, started outside any agent's process tree. Where neither exists, it falls back to a detached process.
 
 ### Why Rust for the keeper

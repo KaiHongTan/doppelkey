@@ -40,8 +40,8 @@ before(() => {
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'sample', private: true, scripts: { start: 'node app.js' } }));
   fs.writeFileSync(path.join(dir, 'app.js'), APP);
   env = { PATH: `${BIN}:${process.env.PATH}`, HOME: home, DOPPELKEY_HOME: path.join(home, 'dk'), DOPPELKEY_SOCK: path.join(home, 'k.sock'), DOPPELKEY_PASSPHRASE: 'correct horse battery staple', DOPPELKEY_SERVICE: 'detached',
-    // The keeper (started by `init`) inherits this: it stands in for the human clicking Allow.
-    DOPPELKEY_ASKPASS: 'true' };
+    // The vault passphrase in the environment stands in for the human: it unlocks the keeper and approves eject.
+  };
 });
 after(() => { if (!missing) spawnSync(path.join(BIN, 'doppelkey'), ['service', 'uninstall'], { env, encoding: 'utf8' }); });
 

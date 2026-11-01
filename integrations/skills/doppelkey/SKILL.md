@@ -19,7 +19,7 @@ Rules:
 - Never replace a handle with a generated value, and never ask the user for the real value.
 - Never try to read the vault, the keeper's memory, or the keychain.
 - To add a secret, ask the user to run `doppelkey set NAME` (it prompts for the value; you must not type it).
-- `doppelkey eject` and loosening a policy need a human to confirm. Don't try to work around that.
+- `doppelkey eject` and loosening a policy need the human: they approve with their vault passphrase. Don't try to work around that, never ask for the passphrase, and never set `DOPPELKEY_PASSPHRASE`.
 
 ## Propose setup
 

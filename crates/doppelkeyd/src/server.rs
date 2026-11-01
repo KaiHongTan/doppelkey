@@ -3,10 +3,10 @@
 //! request id and may be sent out of order.
 
 use crate::audit::{peer_exe, Audit, Peer};
-use crate::confirm;
 use crate::ops::{self, Precheck};
 use crate::state::State;
 use crate::store;
+use crate::{admin, confirm};
 use doppelkey_proto::wire::{self, MAX_FRAME};
 use doppelkey_proto::ErrorCode;
 use serde_json::{json, Value};
@@ -31,6 +31,19 @@ pub struct Shared {
     pub state: Mutex<State>,
     pub audit: Audit,
     pub source: Source,
+    /// Keys a human approved ejecting; only these may be removed with `forget`.
+    pub ejected: Mutex<std::collections::HashSet<String>>,
+}
+
+impl Shared {
+    pub fn new(state: State, audit: Audit, source: Source) -> Shared {
+        Shared {
+            state: Mutex::new(state),
+            audit,
+            source,
+            ejected: Mutex::new(Default::default()),
+        }
+    }
 }
 
 impl Shared {
@@ -207,47 +220,21 @@ pub fn dispatch(shared: &Shared, body: &[u8], peer: &Peer) -> Value {
                 Err(e) => fail(ErrorCode::Locked, &e, Some("doppelkey unlock"), None),
             };
         }
-        "confirm" => {
-            // Human gate for CLI actions that weaken protection (eject, loosening a policy).
-            // The keeper writes the prompt and runs it with its own environment, so the
-            // program asking (possibly an agent) can't approve itself.
-            let detail: String = req
-                .get("detail")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .chars()
-                .filter(|c| !c.is_control())
-                .take(200)
-                .collect();
-            let what = match req.get("action").and_then(Value::as_str) {
-                Some("eject") => "write real secret values back to disk (doppelkey eject)",
-                Some("loosen_policy") => "loosen a key's policy (doppelkey policy)",
-                _ => return wire::err(id, ErrorCode::BadRequest, "unknown confirm action", None),
-            };
-            let who = peer
-                .exe
-                .clone()
-                .unwrap_or_else(|| format!("pid {}", peer.pid.unwrap_or(0)));
-            let prompt = format!("A program ({who}) wants to {what}: {detail}. Allow?");
-            let allowed = matches!(confirm::ask(&prompt), confirm::Answer::Allow);
-            shared.audit.record(
-                &op,
-                None,
-                allowed,
-                if allowed {
-                    None
-                } else {
-                    Some("confirm_denied")
-                },
-                None,
-                peer,
-            );
-            return wire::ok(id, json!({ "allowed": allowed }));
-        }
         "lock" => {
             shared.lock_keys();
             shared.audit.record(&op, None, true, None, None, peer);
             return wire::ok(id, json!({ "locked": true }));
+        }
+        o if admin::OPS.contains(&o) => {
+            return match admin::handle(shared, o, &req, peer) {
+                Ok((value, key)) => {
+                    shared
+                        .audit
+                        .record(&op, key.as_deref(), true, None, None, peer);
+                    wire::ok(id, value)
+                }
+                Err(e) => fail(e.code, &e.message, e.hint.as_deref(), None),
+            };
         }
         _ => {}
     }
@@ -256,7 +243,7 @@ pub fn dispatch(shared: &Shared, body: &[u8], peer: &Peer) -> Value {
     let pre = ops::precheck(&mut shared.state.lock().unwrap(), &req);
     match pre {
         Err(e) => return fail(e.code, &e.message, e.hint.as_deref(), key_name.as_deref()),
-        Ok(Precheck::Confirm { key, prompt }) => match confirm::ask(&prompt) {
+        Ok(Precheck::Confirm { key, prompt }) => match confirm::ask(&prompt, true) {
             confirm::Answer::Allow => shared.state.lock().unwrap().approve(&key),
             confirm::Answer::Deny => return fail(ErrorCode::ConfirmDenied, &format!("use of {key} was denied"), None, Some(&key)),
             confirm::Answer::Unavailable => {
@@ -267,7 +254,14 @@ pub fn dispatch(shared: &Shared, body: &[u8], peer: &Peer) -> Value {
     }
     let result = ops::run(&mut shared.state.lock().unwrap(), &req);
     match result {
-        Ok((value, info)) => {
+        Ok((mut value, info)) => {
+            if op == "status" {
+                // Which vault protection is in use, so the CLI knows whether to ask for the passphrase.
+                value["vault"] = match &shared.source {
+                    Source::TestVault(_) => json!("test"),
+                    Source::Vault { .. } => json!(admin::vault_kind(shared)),
+                };
+            }
             shared.audit.record(
                 &op,
                 info.key.as_deref().or(key_name.as_deref()),

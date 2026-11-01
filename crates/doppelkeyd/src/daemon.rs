@@ -74,11 +74,7 @@ pub fn main() -> std::process::ExitCode {
             )
         }
     };
-    let shared = Arc::new(Shared {
-        state: Mutex::new(state),
-        audit: Audit::new(audit),
-        source,
-    });
+    let shared = Arc::new(Shared::new(state, Audit::new(audit), source));
     if let Source::Vault { path, .. } = &shared.source {
         // Vaults protected by the Keychain or a key file unlock at start; passphrase vaults wait for `doppelkey unlock`.
         match store::read_header(path) {

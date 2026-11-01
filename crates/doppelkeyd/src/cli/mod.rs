@@ -9,14 +9,14 @@ pub mod project;
 pub mod prompt;
 pub mod service;
 
+use crate::paths;
 use crate::state::{Policy, ALL_OPS};
-use crate::store::{self, Header, KekKind, StoredKey, VaultData};
-use crate::{audit, paths};
+use crate::store::{self, KekKind};
 use base64::Engine;
 use clap::{Parser, Subcommand};
 use classify::Decision;
 use client::Client;
-use doppelkey_proto::{handle, Form};
+use doppelkey_proto::Form;
 use project::{FileRec, Manifest, SecretRec};
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -50,7 +50,7 @@ enum Cmd {
         /// Vault protection for a new vault: passphrase, keychain (macOS) or file.
         #[arg(long)]
         protect: Option<KekKind>,
-        /// Don't install or start the keeper service.
+        /// Don't install the keeper service; use a keeper that is already running.
         #[arg(long)]
         no_service: bool,
         /// Project directory (default: current directory).
@@ -259,134 +259,122 @@ fn dir_or_cwd(d: Option<PathBuf>) -> PathBuf {
     fs::canonicalize(&d).unwrap_or(d)
 }
 
-// ---------- vault access ----------
+// ---------- keeper access ----------
+//
+// The CLI never decrypts the vault. The keeper creates it, stores keys and backups, changes
+// policies and ejects; it alone decides whether a human approved (see admin.rs).
 
-pub struct Vault {
-    path: PathBuf,
-    header: Header,
-    kek: crate::state::LockedKey,
-    pub data: VaultData,
-    /// Passphrase used this session (to unlock a freshly started keeper).
-    passphrase: Option<String>,
+/// Connect to the keeper; with `start`, install and start the user service if none is running.
+fn keeper(start: bool) -> R<Client> {
+    if let Ok(c) = Client::connect() {
+        return Ok(c);
+    }
+    if !start {
+        return Err("keeper not running. Start it with \"doppelkey service install\" (or run \"doppelkeyd serve\" yourself)".into());
+    }
+    let how = service::install()?;
+    println!("  {how}");
+    for _ in 0..50 {
+        if let Ok(c) = Client::connect() {
+            return Ok(c);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    Client::connect().map_err(|e| e.to_string())
 }
 
-impl Vault {
-    pub fn open() -> R<Vault> {
-        let path = paths::vault_file();
-        if !path.exists() {
-            return Err("no vault yet. Run \"doppelkey init\" first".into());
-        }
-        let (header, _, _) = store::read_header(&path)?;
-        let passphrase = if header.kek == KekKind::Passphrase {
-            Some(prompt::passphrase("Vault passphrase: ")?)
-        } else {
-            None
-        };
-        let kek = store::kek_for(&header, passphrase.as_deref())?;
-        let (header, data) = store::open(&path, kek.bytes())?;
-        Ok(Vault {
-            path,
-            header,
-            kek,
-            data,
-            passphrase,
-        })
-    }
-
-    fn open_or_create(kind: Option<KekKind>) -> R<Vault> {
-        let path = paths::vault_file();
-        if path.exists() {
-            return Vault::open();
-        }
-        let kind = match kind {
-            Some(k) => k,
-            None if cfg!(all(target_os = "macos", feature = "macos-keychain")) => KekKind::Keychain,
-            None if prompt::is_interactive() || std::env::var_os("DOPPELKEY_PASSPHRASE").is_some() => KekKind::Passphrase,
-            None => return Err("choose how to protect the new vault: --protect passphrase (recommended) or --protect file (no protection at rest)".into()),
-        };
-        let passphrase = if kind == KekKind::Passphrase {
-            println!("Creating the doppelkey vault. Its passphrase unlocks the keeper after each login; agents never see it.");
-            Some(prompt::new_passphrase()?)
-        } else {
-            None
-        };
-        if kind == KekKind::File {
-            eprintln!("doppelkey: warning: --protect file stores the vault key next to the vault. A same-user process can read both; use it only for throwaway keys.");
-        }
-        store::create(&path, kind, passphrase.as_deref())?;
-        let kek = store::kek_for(&store::read_header(&path)?.0, passphrase.as_deref())?;
-        let (header, data) = store::open(&path, kek.bytes())?;
-        Ok(Vault {
-            path,
-            header,
-            kek,
-            data,
-            passphrase,
-        })
-    }
-
-    pub fn save(&self) -> R<()> {
-        store::save(&self.path, &self.header, self.kek.bytes(), &self.data)
-    }
+fn call(c: &mut Client, op: &str, params: serde_json::Value) -> R<serde_json::Value> {
+    c.call(op, params).map_err(|e| e.to_string())
 }
 
-/// Tell the keeper about vault changes; start it if needed. Returns a status line.
-fn sync_keeper(v: &Vault, start: bool) -> String {
-    match client::reload_keeper() {
-        Ok(true) => {
-            if let Some(p) = &v.passphrase {
-                if let Ok(mut c) = Client::connect() {
-                    let _ = c.call("unlock", json!({ "passphrase": p }));
-                }
+/// Make sure the keeper has an unlocked vault, creating one if `create` allows it (the vault
+/// protection comes from `protect`, else the platform default). Returns the passphrase if this
+/// call asked for it, so a later human-approval step can reuse it.
+fn ensure_vault(c: &mut Client, create: bool, protect: Option<KekKind>) -> R<Option<String>> {
+    let st = call(c, "status", json!({}))?;
+    match st["vault"].as_str() {
+        None | Some("") if !create => Err("no vault yet. Run \"doppelkey init\" first".into()),
+        None | Some("") => {
+            let kind = match protect {
+                Some(k) => k,
+                None if cfg!(all(target_os = "macos", feature = "macos-keychain")) => KekKind::Keychain,
+                None if prompt::is_interactive() || std::env::var_os("DOPPELKEY_PASSPHRASE").is_some() => KekKind::Passphrase,
+                None => return Err("choose how to protect the new vault: --protect passphrase (recommended) or --protect file (no protection at rest)".into()),
+            };
+            let pass = if kind == KekKind::Passphrase {
+                println!("Creating the doppelkey vault. Its passphrase unlocks the keeper after each login and approves eject; agents never see it.");
+                Some(prompt::new_passphrase()?)
+            } else {
+                None
+            };
+            if kind == KekKind::File {
+                eprintln!("doppelkey: warning: --protect file stores the vault key next to the vault. A same-user process can read both; use it only for throwaway keys.");
             }
-            "keeper updated".into()
+            let protect = match kind {
+                KekKind::Passphrase => "passphrase",
+                KekKind::Keychain => "keychain",
+                KekKind::File => "file",
+            };
+            call(
+                c,
+                "vault_create",
+                json!({ "protect": protect, "passphrase": pass }),
+            )?;
+            Ok(pass)
         }
-        Ok(false) if start => match service::install() {
-            Ok(m) => {
-                if let Some(p) = &v.passphrase {
-                    std::thread::sleep(std::time::Duration::from_millis(300));
-                    if let Ok(mut c) = Client::connect() {
-                        let _ = c.call("unlock", json!({ "passphrase": p }));
-                    }
-                }
-                m
-            }
-            Err(e) => format!("could not start the keeper: {e}"),
-        },
-        Ok(false) => "keeper not running (start it with \"doppelkey service install\")".into(),
-        Err(e) => format!("keeper did not reload: {e}"),
+        Some(_) if st["locked"] == json!(true) => {
+            let pass = prompt::passphrase("Vault passphrase: ")?;
+            call(c, "unlock", json!({ "passphrase": pass }))?;
+            Ok(Some(pass))
+        }
+        Some(_) => Ok(None),
     }
 }
 
-/// A human must approve: a terminal prompt, or a prompt shown by the keeper. The keeper runs
-/// its prompt with its own environment, so a non-interactive caller (an agent) can't approve
-/// its own request, e.g. by setting DOPPELKEY_ASKPASS for this process.
-fn human_confirm(action: &str, detail: &str) -> bool {
-    if prompt::is_interactive() {
-        return prompt::yes_no(&format!("Allow doppelkey to {detail}?"));
+/// For a passphrase vault, the passphrase is how a human approves eject and loosening a
+/// policy: ask for it if there is a terminal (or DOPPELKEY_PASSPHRASE is set). The keeper
+/// checks it; without it the keeper refuses.
+fn approval_passphrase(c: &mut Client, have: Option<String>) -> R<Option<String>> {
+    if have.is_some() {
+        return Ok(have);
     }
-    match Client::connect()
-        .and_then(|mut c| c.call("confirm", json!({ "action": action, "detail": detail })))
-    {
-        Ok(r) => r.get("allowed") == Some(&json!(true)),
-        Err(e) => {
-            eprintln!("doppelkey: cannot ask for confirmation: {e}");
-            false
-        }
+    let st = call(c, "status", json!({}))?;
+    if st["vault"] != json!("passphrase") {
+        return Ok(None);
     }
+    if std::env::var_os("DOPPELKEY_PASSPHRASE").is_none() && !prompt::is_interactive() {
+        return Ok(None);
+    }
+    Ok(Some(prompt::passphrase("Vault passphrase (to approve): ")?))
 }
 
-fn new_id(v: &VaultData) -> String {
-    loop {
-        let id = handle::new_id(crate::crypto::random_bytes::<6>());
-        if !v.keys.contains_key(&id) {
-            return id;
-        }
+/// Store a key in the vault; returns (id, handle text to write).
+fn import_key(
+    c: &mut Client,
+    dir: &Path,
+    name: &str,
+    file: &Path,
+    plan: &classify::Plan,
+    original: &str,
+) -> R<(String, String)> {
+    let r = call(
+        c,
+        "import",
+        json!({
+            "name": name,
+            "value_b64": B64.encode(&plan.key),
+            "form": plan.form,
+            "prefix": plan.prefix,
+            "policy": plan.policy,
+            "project": dir.display().to_string(),
+            "file": file.display().to_string(),
+            "original": original,
+        }),
+    )?;
+    match (r["id"].as_str(), r["written"].as_str()) {
+        (Some(id), Some(w)) => Ok((id.to_string(), w.to_string())),
+        _ => Err("the keeper sent an unexpected reply to import".into()),
     }
-}
-
-fn now() -> String {
-    audit::now_rfc3339()
 }
 
 // ---------- init / protect / set ----------
@@ -465,7 +453,8 @@ fn init(dir: &Path, yes: bool, dry_run: bool, protect: Option<KekKind>, no_servi
             return Err("cancelled".into());
         }
     }
-    let mut v = Vault::open_or_create(protect)?;
+    let mut c = keeper(!no_service)?;
+    ensure_vault(&mut c, true, protect)?;
     let mut manifest = Manifest::load(dir).unwrap_or(Manifest {
         version: 1,
         ..Default::default()
@@ -479,20 +468,7 @@ fn init(dir: &Path, yes: bool, dry_run: bool, protect: Option<KekKind>, no_servi
         let text = fs::read_to_string(&file).map_err(|e| e.to_string())?;
         let mut edits = Vec::new();
         for p in items {
-            let id = reuse_or_new(&v.data, dir, &p.plan.key);
-            let written =
-                handle::env_value(&id, p.plan.form, &p.plan.prefix, p.plan.key.len(), false)?;
-            v.data.keys.entry(id.clone()).or_insert_with(|| StoredKey {
-                name: p.var.name.clone(),
-                value: B64.encode(&p.plan.key),
-                policy: p.plan.policy.clone(),
-                form: p.plan.form,
-                project: Some(dir.display().to_string()),
-                file: Some(file.display().to_string()),
-                original: Some(p.var.value.clone()),
-                written: Some(written.clone()),
-                created: now(),
-            });
+            let (id, written) = import_key(&mut c, dir, &p.var.name, &file, &p.plan, &p.var.value)?;
             manifest.secrets.push(SecretRec {
                 name: p.var.name.clone(),
                 file: project::rel(dir, &file),
@@ -504,41 +480,29 @@ fn init(dir: &Path, yes: bool, dry_run: bool, protect: Option<KekKind>, no_servi
         fs::write(&file, envfile::splice(&text, edits))
             .map_err(|e| format!("cannot write {}: {e}", file.display()))?;
     }
-    apply_changes(dir, &mut v, &mut manifest, changes)?;
-    v.save()?;
+    apply_changes(dir, &mut c, &mut manifest, changes)?;
     manifest.save(dir)?;
-    let keeper = if no_service {
-        "keeper not started (--no-service)".to_string()
-    } else {
-        sync_keeper(&v, true)
-    };
-    println!("\nProtected {count} secret(s); {keeper}.");
+    println!("\nProtected {count} secret(s); the keeper holds them.");
     println!("Next: run your app and tests as usual. Check the setup with \"doppelkey doctor\"; undo with \"doppelkey eject\".");
     Ok(())
 }
 
-/// Same value in the same project gets the same handle (e.g. in .env and .env.local).
-fn reuse_or_new(data: &VaultData, dir: &Path, key: &[u8]) -> String {
-    let want = B64.encode(key);
-    let proj = dir.display().to_string();
-    data.keys
-        .iter()
-        .find(|(_, k)| k.value == want && k.project.as_deref() == Some(proj.as_str()))
-        .map(|(id, _)| id.clone())
-        .unwrap_or_else(|| new_id(data))
-}
-
 fn apply_changes(
     dir: &Path,
-    v: &mut Vault,
+    keeper: &mut Client,
     manifest: &mut Manifest,
     changes: Vec<project::Change>,
 ) -> R<()> {
     for c in changes {
         let abs = c.path.display().to_string();
-        if c.existed && !v.data.backups.contains_key(&abs) {
+        if c.existed {
+            // The keeper keeps the first backup of each file, so re-running init can't replace it.
             let orig = fs::read(&c.path).map_err(|e| e.to_string())?;
-            v.data.backups.insert(abs.clone(), B64.encode(orig));
+            call(
+                keeper,
+                "backup_put",
+                json!({ "path": abs, "content_b64": B64.encode(orig) }),
+            )?;
         }
         let mut created_dir = None;
         if let Some(parent) = c.path.parent() {
@@ -640,23 +604,9 @@ fn protect_one(
     if !allow.is_empty() {
         plan.policy.allow = ops_from(allow)?;
     }
-    let mut v = Vault::open()?;
-    let id = reuse_or_new(&v.data, dir, &plan.key);
-    let written = handle::env_value(&id, plan.form, &plan.prefix, plan.key.len(), false)?;
-    v.data.keys.insert(
-        id.clone(),
-        StoredKey {
-            name: name.into(),
-            value: B64.encode(&plan.key),
-            policy: plan.policy,
-            form: plan.form,
-            project: Some(dir.display().to_string()),
-            file: Some(f.display().to_string()),
-            original: Some(var.value.clone()),
-            written: Some(written.clone()),
-            created: now(),
-        },
-    );
+    let mut c = keeper(true)?;
+    ensure_vault(&mut c, false, None)?;
+    let (id, written) = import_key(&mut c, dir, name, &f, &plan, &var.value)?;
     fs::write(
         &f,
         envfile::splice(&text, vec![(var.start, var.end, written)]),
@@ -671,13 +621,8 @@ fn protect_one(
         file: project::rel(dir, &f),
         id,
     });
-    v.save()?;
     m.save(dir)?;
-    println!(
-        "Protected {name} in {}; {}.",
-        project::rel(dir, &f),
-        sync_keeper(&v, false)
-    );
+    println!("Protected {name} in {}.", project::rel(dir, &f));
     Ok(())
 }
 
@@ -725,13 +670,13 @@ fn set(
     if !allow.is_empty() {
         plan.policy.allow = ops_from(allow)?;
     }
-    let mut v = Vault::open_or_create(None)?;
-    let id = reuse_or_new(&v.data, dir, &plan.key);
-    let written = handle::env_value(&id, plan.form, &plan.prefix, plan.key.len(), false)?;
     let path = dir.join(file);
+    let mut c = keeper(true)?;
+    ensure_vault(&mut c, true, None)?;
+    let (id, written) = import_key(&mut c, dir, name, &path, &plan, &value)?;
     let text = fs::read_to_string(&path).unwrap_or_default();
     let new_text = match envfile::parse(&text).into_iter().find(|x| x.name == name) {
-        Some(var) => envfile::splice(&text, vec![(var.start, var.end, written.clone())]),
+        Some(var) => envfile::splice(&text, vec![(var.start, var.end, written)]),
         None => format!(
             "{text}{}{name}={written}\n",
             if text.is_empty() || text.ends_with('\n') {
@@ -741,20 +686,6 @@ fn set(
             }
         ),
     };
-    v.data.keys.insert(
-        id.clone(),
-        StoredKey {
-            name: name.into(),
-            value: B64.encode(&plan.key),
-            policy: plan.policy,
-            form: plan.form,
-            project: Some(dir.display().to_string()),
-            file: Some(path.display().to_string()),
-            original: Some(value),
-            written: Some(written),
-            created: now(),
-        },
-    );
     fs::write(&path, new_text).map_err(|e| e.to_string())?;
     let mut m = Manifest::load(dir).unwrap_or(Manifest {
         version: 1,
@@ -767,12 +698,10 @@ fn set(
         file: project::rel(dir, &path),
         id,
     });
-    v.save()?;
     m.save(dir)?;
     println!(
-        "Stored {name}; {} now holds its handle; {}.",
-        project::rel(dir, &path),
-        sync_keeper(&v, false)
+        "Stored {name}; {} now holds its handle.",
+        project::rel(dir, &path)
     );
     Ok(())
 }
@@ -783,44 +712,46 @@ fn eject(dir: &Path, keep_keys: bool) -> R<()> {
     let m = Manifest::load(dir).ok_or(
         "this project has no doppelkey manifest (.doppelkey/manifest.json); nothing to eject",
     )?;
-    if !human_confirm(
-        "eject",
-        &format!(
-            "write the real values of the secrets back into the .env files of {}",
-            dir.display()
-        ),
-    ) {
-        return Err("eject writes real secrets to disk, so a human must confirm it in a terminal or in the keeper's prompt. Nothing changed".into());
-    }
-    let mut v = Vault::open()?;
-    let mut problems = Vec::new();
-    let mut by_file: BTreeMap<String, Vec<&SecretRec>> = BTreeMap::new();
-    for s in &m.secrets {
-        by_file.entry(s.file.clone()).or_default().push(s);
-    }
-    for (file, secrets) in by_file {
-        let path = dir.join(&file);
-        let mut text = fs::read_to_string(&path)
-            .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-        for s in secrets {
-            let Some(k) = v.data.keys.get(&s.id) else {
-                problems.push(format!("{}: {} is not in the vault", file, s.name));
-                continue;
-            };
-            let (Some(written), Some(original)) = (&k.written, &k.original) else {
-                continue;
-            };
-            if text.contains(written.as_str()) {
-                text = text.replace(written.as_str(), original);
-            } else {
-                problems.push(format!(
-                    "{file}: the handle for {} was not found (edited by hand?)",
-                    s.name
-                ));
-            }
-        }
-        fs::write(&path, text).map_err(|e| e.to_string())?;
-    }
+    let mut c = keeper(true)?;
+    let pass = ensure_vault(&mut c, false, None)?;
+    let pass = approval_passphrase(&mut c, pass)?;
+    let ids: Vec<String> = m.secrets.iter().map(|s| s.id.clone()).collect();
+    let targets: Vec<serde_json::Value> = m
+        .secrets
+        .iter()
+        .map(|s| json!({ "id": s.id, "file": dir.join(&s.file).display().to_string() }))
+        .collect();
+    let backup_paths: Vec<String> = m
+        .files
+        .iter()
+        .filter(|f| !f.created)
+        .map(|f| dir.join(&f.path).display().to_string())
+        .collect();
+    // The keeper checks the human's approval, then writes the real values back into the files
+    // they came from itself: key material never passes through this process.
+    let r = c
+        .call(
+            "eject",
+            json!({ "ids": ids, "targets": targets, "paths": backup_paths, "project": dir.display().to_string(), "passphrase": pass }),
+        )
+        .map_err(|e| format!("eject refused (it writes real secrets to disk): {e}"))?;
+    let restored: Vec<String> = r["restored"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x["id"].as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut problems: Vec<String> = r["problems"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    let backups = r["backups"].as_object().cloned().unwrap_or_default();
     for f in m.files.iter().rev() {
         let path = dir.join(&f.path);
         let abs = path.display().to_string();
@@ -829,7 +760,11 @@ fn eject(dir: &Path, keep_keys: bool) -> R<()> {
         if f.created && untouched {
             let _ = fs::remove_file(&path);
         } else if !f.created && untouched {
-            if let Some(orig) = v.data.backups.get(&abs).and_then(|b| B64.decode(b).ok()) {
+            if let Some(orig) = backups
+                .get(&abs)
+                .and_then(|b| b.as_str())
+                .and_then(|b| B64.decode(b).ok())
+            {
                 fs::write(&path, orig).map_err(|e| e.to_string())?;
             }
         } else if let Some(ins) = f
@@ -849,35 +784,37 @@ fn eject(dir: &Path, keep_keys: bool) -> R<()> {
                 f.path
             ));
         }
-        v.data.backups.remove(&abs);
         if let Some(d) = &f.created_dir {
             let _ = fs::remove_dir(dir.join(d)); // only succeeds if empty
         }
     }
-    if !keep_keys {
-        let others = other_manifests_ids(dir);
-        for s in &m.secrets {
-            if !others.contains(&s.id) {
-                v.data.keys.remove(&s.id);
-            }
-        }
+    // Files are restored; now the keeper may drop the keys and backups.
+    let forget_ids: Vec<&String> = if keep_keys {
+        Vec::new()
+    } else {
+        restored.iter().collect()
+    };
+    if let Err(e) = c.call(
+        "forget",
+        json!({ "ids": forget_ids, "paths": backup_paths }),
+    ) {
+        problems.push(format!("the keeper kept the keys: {e}"));
     }
     let _ = fs::remove_file(dir.join(project::MANIFEST));
     let _ = fs::remove_dir(dir.join(".doppelkey"));
-    v.save()?;
-    let k = sync_keeper(&v, false);
     for p in &problems {
         eprintln!("doppelkey: warning: {p}");
     }
     println!(
-        "Ejected: real values restored in {} secret(s); {k}.",
-        m.secrets.len()
+        "Ejected: real values restored in {} secret(s){}.",
+        restored.len(),
+        if keep_keys {
+            "; keys kept in the vault"
+        } else {
+            ""
+        }
     );
     Ok(())
-}
-
-fn other_manifests_ids(_dir: &Path) -> Vec<String> {
-    Vec::new()
 }
 
 // ---------- run / log / status / unlock / list ----------
@@ -1054,6 +991,7 @@ fn print_env(dir: &Path) -> R<()> {
 
 // ---------- policy ----------
 
+#[derive(serde::Serialize)]
 struct PolicyEdit {
     allow: Vec<String>,
     deny: Vec<String>,
@@ -1076,13 +1014,9 @@ impl PolicyEdit {
             && self.allow_service.is_empty()
             && self.deny_service.is_empty()
     }
-    /// Does this edit make the key usable in more ways? Those need a human.
-    fn loosens(&self) -> bool {
-        !self.allow.is_empty() || self.no_rate || self.no_confirm || !self.allow_service.is_empty()
-    }
 }
 
-fn ids_for_name(dir: &Path, v: &VaultData, name: &str) -> R<Vec<String>> {
+fn ids_for_name(dir: &Path, c: &mut Client, name: &str) -> R<Vec<String>> {
     if let Some(m) = Manifest::load(dir) {
         let ids: Vec<String> = m
             .secrets
@@ -1094,93 +1028,64 @@ fn ids_for_name(dir: &Path, v: &VaultData, name: &str) -> R<Vec<String>> {
             return Ok(ids);
         }
     }
-    let ids: Vec<String> = v
-        .keys
-        .iter()
-        .filter(|(_, k)| k.name == name)
-        .map(|(id, _)| id.clone())
-        .collect();
-    match ids.len() {
-        0 => Err(format!("no key named {name} in the vault")),
-        _ => Ok(ids),
+    let r = call(c, "policies", json!({ "name": name }))?;
+    let ids: Vec<String> = r["keys"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|k| k["id"].as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    if ids.is_empty() {
+        return Err(format!(
+            "no key named {name} in the vault. See the names with \"doppelkey status\""
+        ));
     }
+    Ok(ids)
 }
 
-fn policy_toml(name: &str, p: &Policy) -> String {
+fn policy_toml(name: &str, p: &serde_json::Value) -> String {
     let mut t = toml::Table::new();
     let v = toml::Value::try_from(p).unwrap_or(toml::Value::Table(Default::default()));
     t.insert(name.to_string(), v);
     toml::to_string(&t).unwrap_or_default()
 }
 
+fn print_policies(r: &serde_json::Value) {
+    for k in r["keys"].as_array().cloned().unwrap_or_default() {
+        print!(
+            "{}",
+            policy_toml(k["name"].as_str().unwrap_or("?"), &k["policy"])
+        );
+    }
+}
+
 fn policy(dir: &Path, name: Option<String>, edit: PolicyEdit) -> R<()> {
-    let mut v = Vault::open()?;
+    let mut c = keeper(true)?;
+    let pass = ensure_vault(&mut c, false, None)?;
     let Some(name) = name else {
-        for k in v.data.keys.values() {
-            print!("{}", policy_toml(&k.name, &k.policy));
-        }
+        print_policies(&call(&mut c, "policies", json!({}))?);
         return Ok(());
     };
-    let ids = ids_for_name(dir, &v.data, &name)?;
+    let ids = ids_for_name(dir, &mut c, &name)?;
     if edit.is_empty() {
-        for id in &ids {
-            print!("{}", policy_toml(&name, &v.data.keys[id].policy));
-        }
+        print_policies(&call(&mut c, "policies", json!({ "ids": ids }))?);
         return Ok(());
     }
-    let mut allow_ops = Vec::new();
-    let mut sigv2 = None;
-    for a in &edit.allow {
-        if a == "sigv2" {
-            sigv2 = Some(true);
-        } else {
-            allow_ops.push(a.clone());
-        }
-    }
-    let deny_sigv2 = edit.deny.iter().any(|d| d == "sigv2");
-    let allow_ops = ops_from(allow_ops)?;
-    if edit.loosens() && !human_confirm("loosen_policy", &format!("loosen the policy for {name}")) {
-        return Err("loosening a policy needs a human to confirm it in a terminal or in the keeper's prompt. Nothing changed".into());
-    }
-    for id in &ids {
-        let p = &mut v.data.keys.get_mut(id).unwrap().policy;
-        for a in &allow_ops {
-            if !p.allow.contains(a) {
-                p.allow.push(a.clone());
+    // Tightening needs no approval. If the keeper says this loosens the policy and the vault
+    // has a passphrase, ask for it (that is how a human approves) and try once more.
+    let req = |p: &Option<String>| json!({ "ids": ids, "edit": edit, "passphrase": p });
+    let r = match c.call("set_policy", req(&pass)) {
+        Err(e) if e.code == "confirm_denied" && pass.is_none() => {
+            match approval_passphrase(&mut c, None)? {
+                Some(p) => c.call("set_policy", req(&Some(p))),
+                None => Err(e),
             }
         }
-        p.allow.retain(|a| !edit.deny.contains(a));
-        if let Some(s) = sigv2 {
-            p.sigv2 = s;
-        }
-        if deny_sigv2 {
-            p.sigv2 = false;
-        }
-        if let Some(r) = edit.rate {
-            p.rate_per_minute = Some(r);
-        }
-        if edit.no_rate {
-            p.rate_per_minute = None;
-        }
-        if edit.confirm {
-            p.confirm = true;
-        }
-        if edit.no_confirm {
-            p.confirm = false;
-        }
-        if !edit.allow_service.is_empty() || !edit.deny_service.is_empty() {
-            let mut s = p.services.clone().unwrap_or_default();
-            for x in &edit.allow_service {
-                if !s.contains(x) {
-                    s.push(x.clone());
-                }
-            }
-            s.retain(|x| !edit.deny_service.contains(x));
-            p.services = Some(s);
-        }
-        print!("{}", policy_toml(&name, p));
+        other => other,
     }
-    v.save()?;
-    println!("# {}", sync_keeper(&v, false));
+    .map_err(|e| format!("policy not changed: {e}"))?;
+    print_policies(&r);
     Ok(())
 }

@@ -1,8 +1,11 @@
-//! Human confirmation for keys with `confirm = true` (like `ssh-add -c`). The keeper runs the
-//! prompt itself, so it appears outside any agent's terminal.
+//! Prompts the keeper shows a human: per-key `confirm = true` (like `ssh-add -c`), and approval
+//! of eject or policy loosening on vaults without a passphrase (see admin.rs). The keeper runs
+//! the prompt itself, so it appears outside any agent's terminal.
 //!
-//! Program, first match wins: $DOPPELKEY_ASKPASS (exit 0 = allow), macOS `osascript`,
-//! Linux `zenity` or `kdialog`. With none available the request is refused.
+//! Program, first match wins: $DOPPELKEY_ASKPASS (exit 0 = allow) where the caller allows it,
+//! macOS `/usr/bin/osascript`, Linux `/usr/bin/zenity` or `/usr/bin/kdialog`. Programs are run
+//! by absolute path from a directory a same-user process can't write, so a fake `osascript`
+//! earlier on PATH can't answer. With none available the request is refused.
 
 use std::process::{Command, Stdio};
 
@@ -12,14 +15,14 @@ pub enum Answer {
     Unavailable,
 }
 
-pub fn ask(prompt: &str) -> Answer {
+pub fn ask(prompt: &str, allow_askpass: bool) -> Answer {
     let run = |mut c: Command| -> Option<bool> {
         c.stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
         c.status().ok().map(|s| s.success())
     };
-    if let Some(prog) = std::env::var_os("DOPPELKEY_ASKPASS") {
+    if let Some(prog) = std::env::var_os("DOPPELKEY_ASKPASS").filter(|_| allow_askpass) {
         let mut c = Command::new(prog);
         c.arg(prompt);
         return match run(c) {
@@ -34,7 +37,7 @@ pub fn ask(prompt: &str) -> Answer {
             prompt.replace('\\', "\\\\").replace('"', "\\\"")
         );
         // Only an explicit click on Allow counts. A timeout ("gave up:true") also exits 0.
-        return match Command::new("osascript")
+        return match Command::new("/usr/bin/osascript")
             .args(["-e", &script])
             .stdin(Stdio::null())
             .stderr(Stdio::null())
@@ -57,14 +60,14 @@ pub fn ask(prompt: &str) -> Answer {
     if std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some() {
         for (prog, args) in [
             (
-                "zenity",
+                "/usr/bin/zenity",
                 vec!["--question", "--title=doppelkey", "--timeout=60"],
             ),
-            ("kdialog", vec!["--title", "doppelkey", "--yesno"]),
+            ("/usr/bin/kdialog", vec!["--title", "doppelkey", "--yesno"]),
         ] {
             let mut c = Command::new(prog);
             c.args(&args);
-            if prog == "zenity" {
+            if prog.ends_with("zenity") {
                 c.arg(format!("--text={prompt}"));
             } else {
                 c.arg(prompt);
