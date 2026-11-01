@@ -3,4 +3,4 @@ itsdangerous>=2.1
 django>=4.2
 flask>=3.0
 boto3>=1.34
-cryptography>=42
+cryptography>=50.0.2
